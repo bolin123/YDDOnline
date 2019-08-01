@@ -7,6 +7,7 @@ static uint32_t g_sleepTime;
 
 void PMWakeup(void)
 {
+#if 0
     int i;
 
     g_startSleep = false;
@@ -18,12 +19,15 @@ void PMWakeup(void)
             g_pm[i - 1].wakeup(&g_pm[i - 1]);
         }
     }
+#endif
 }
 
 void PMStartSleep(uint32_t after)
 {
+#if 0
     g_startSleep = true;
     g_sleepTime = SysTime() + after;
+#endif
 }
 
 

@@ -1,4 +1,6 @@
 #include "HalCommon.h"
+#include "stm32f10x_pwr.h"
+#include "W25Q64.h"
 
 static volatile uint32_t g_sysTimeCount = 0;
 uint8_t g_commonBuff[4096];
@@ -14,7 +16,7 @@ int fputc(int ch, FILE *f)
 
 static void halIOUartSendbyte(uint8_t val)
 {
-    uint16_t delay = 68;
+    uint16_t delay = 95;
     HalGPIOSetLevel(HAL_IO_UART_PIN, 0);
     HalWaitUs(delay); //8.6us,115200bps
 
@@ -52,24 +54,29 @@ void HalInterruptSet(bool enable)
 
 void HalCommonWakeup(void)
 {
+    SystemInit();
     HalExtiWakeupSet(false);
     HalTimerStart();
-    HalExtiFreqStart();    
+    HalExtiFreqStart();
+    W25Q64Wakeup();
 }
 
 void HalCommonFallasleep(void)
 {
+    W25Q64PowerDown();
     HalExtiFreqStop();
     HalTimerStop();
     HalExtiWakeupSet(true);
     //HalADCStop();
 #if 1
-    
+    PWR_EnterSTOPMode(PWR_Regulator_LowPower, PWR_STOPEntry_WFI);
+    /*
     PWR->CR |= PWR_CR_CWUF;
     #if defined ( __CC_ARM )
         __force_stores();
     #endif
     __WFI();
+    */
 #endif
 }
 
@@ -86,6 +93,8 @@ static void periphClockInit(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+    
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
@@ -114,7 +123,10 @@ static void testPrint(void)
 static void halInit(void)
 {
     HalGPIOConfig(HAL_IO_UART_PIN, HAL_IO_OUTPUT);    
-    HalCommonWakeup();
+    //HalCommonWakeup();
+    HalExtiWakeupSet(false);
+    HalTimerStart();
+    HalExtiFreqStart(); 
 }
 
 uint16_t HalCommonInitialize(void)

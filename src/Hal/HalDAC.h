@@ -3,6 +3,7 @@
 
 #include "HalCtype.h"
 
+void HalDACEnable(bool enable);
 void HalDACSetValue(uint16_t value);
 void HalDACInitialize(void);
 void HalDACPoll(void);

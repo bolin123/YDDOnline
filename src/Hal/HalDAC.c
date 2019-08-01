@@ -1,5 +1,18 @@
 #include "HalDAC.h"
 
+void HalDACEnable(bool enable)
+{
+    if(enable)
+    {   
+        DAC_Cmd(DAC_Channel_1, ENABLE);
+    }
+    else
+    {
+        DAC_SoftwareTriggerCmd(DAC_Channel_1, DISABLE);
+        DAC_Cmd(DAC_Channel_1, DISABLE);
+    }
+}
+
 void HalDACSetValue(uint16_t value)
 {
     DAC_SetChannel1Data(DAC_Align_12b_R, value);     //1892 base = 1.515v, 62 = 0.05v

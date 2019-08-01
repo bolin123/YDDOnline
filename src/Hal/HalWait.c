@@ -3,21 +3,21 @@
 
 void HalWaitUs(uint16_t us)
 {
-    uint16_t count = 0;
+//    uint16_t count = 0;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct;
 
-    TIM_TimeBaseInitStruct.TIM_Prescaler = 50 - 1;
-    TIM_TimeBaseInitStruct.TIM_Period = 1;
+    TIM_TimeBaseInitStruct.TIM_Prescaler = 72 - 1;
+    TIM_TimeBaseInitStruct.TIM_Period = us;
     TIM_TimeBaseInit(TIM6, &TIM_TimeBaseInitStruct);
     TIM_ClearFlag(TIM6, TIM_FLAG_Update);
     TIM_Cmd(TIM6, ENABLE);
 
-    while(count < us)
+    while(1)
     {
-      if((TIM6->SR) & TIM_IT_Update)
+        if((TIM6->SR) & TIM_IT_Update)
     	{
-    		TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
-    		count++;
+    		TIM6->SR = (uint16_t)~TIM_IT_Update;
+    		break;
     	}
     }
     TIM_Cmd(TIM6, DISABLE);

@@ -7,6 +7,7 @@
 #include "Sensor/SPress.h"
 #include "Sensor/SNoise.h"
 #include "PowerManager.h"
+#include "Temperature.h"
 
 #define YDD_FALL_SLEEP_DELAY 1000
 
@@ -204,12 +205,14 @@ void YDDOnlineInit(void)
     yddPowerInit();
     DigitalLEDInit();
     RFModuleInit();
+    TemperatureInit();
     SensorsInitialize(sensorsEventHandle);
     g_sensors = SensorsCreate();
     sensorsHandleInit(g_sensors);
 
     DigitalLEDSetChars(DIGITAL_LED_ID_CMD, 0x0E, false);
     DigitalLEDOn();
+    //PMStartSleep(5000);
 }
 
 void YDDOnlinePoll(void)
@@ -217,6 +220,7 @@ void YDDOnlinePoll(void)
     DigitalLEDPoll();
     SensorsPoll(g_sensors);
     RFModulePoll();
+    TemperaturePoll();
     //sleepHandle();
 }
 
