@@ -23,9 +23,6 @@ typedef struct
 
 static Sensors_t *g_sensors = NULL;
 static SensorsContext_t g_sensorContext[HAL_SENSOR_ID_COUNT];
-//static bool g_fallSleep = false;
-//static uint32_t g_sleepTime = 0;
-
 
 static void yddWakeup(PM_t *pm)
 {
@@ -37,8 +34,7 @@ static void yddWakeup(PM_t *pm)
         HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 1);
         HalGPIOSetLevel(HAL_485_POWER_PIN,     0);
         HalGPIOSetLevel(HAL_IR_POWER_PIN,      0);
-        //HalCommonWakeup();
-        //RFModuleWakeup();
+        TemperaturePowerOn();
         SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
         Syslog("");
         pm->status = PM_STATUS_WAKEUP;
@@ -63,6 +59,35 @@ static void yddSleep(PM_t *pm)
     
     //RFModuleSleep();
     //HalCommonFallasleep();
+}
+
+static uint16_t getTemperature(void)
+{
+    uint8_t i, j;
+    uint16_t temp;
+    uint16_t buff[5];
+
+    for(i = 0; i < 5; i++)
+    {
+        buff[i] = TemperatureGetValue();
+        printf("%d\n", buff[i]);
+        HalWaitMs(10);
+    }
+
+    for(i = 0; i < 5 - 1; i++)
+    {
+        for(j = 0; j < 5 - i - 1; j++)
+        {
+            if(buff[i] > buff[i + 1])
+            {
+                temp = buff[i];
+                buff[i] = buff[i + 1];
+                buff[i + 1] = temp;
+            }
+        }
+    }
+
+    return (uint16_t)(TemperatureValueExchange(buff[2]) * 10);
 }
 
 static void reportSensorsValue(SensorsContext_t *context, uint8_t num)
@@ -103,22 +128,15 @@ static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
     {
         if(RFModuleDetected())
         {
+        HalInterruptSet(false);
+            printf("temperature = %d\n", getTemperature());
+        HalInterruptSet(true);
             reportSensorsValue(g_sensorContext, HAL_SENSOR_ID_COUNT);
             //sleepSet(true, YDD_FALL_SLEEP_DELAY);
             PMStartSleep(YDD_FALL_SLEEP_DELAY);
         }
     }
 }
-
-#if 0
-static void sleepHandle(void)
-{
-    if(RFModuleDetected() && g_fallSleep && SysTime() > g_sleepTime)
-    {
-        fallSleep();
-    }
-}
-#endif
 
 void YDDOnlineSensorFreqTrigger(uint8_t ch)
 {
@@ -205,14 +223,26 @@ void YDDOnlineInit(void)
     yddPowerInit();
     DigitalLEDInit();
     RFModuleInit();
-    TemperatureInit();
     SensorsInitialize(sensorsEventHandle);
     g_sensors = SensorsCreate();
     sensorsHandleInit(g_sensors);
 
     DigitalLEDSetChars(DIGITAL_LED_ID_CMD, 0x0E, false);
     DigitalLEDOn();
-    //PMStartSleep(5000);
+    //PMStartSleep(5000); //test sleep
+}
+
+//extern uint8_t DS18B20ReadTemp(void);
+static void testTemperature(void)
+{
+    static uint32_t oldtime;
+    if(SysTimeHasPast(oldtime, 1000))
+    {
+        HalInterruptSet(false);            
+        printf("temp = %f\n", TemperatureValueExchange(TemperatureGetValue()));
+        HalInterruptSet(true);
+        oldtime = SysTime();
+    }
 }
 
 void YDDOnlinePoll(void)
@@ -220,7 +250,7 @@ void YDDOnlinePoll(void)
     DigitalLEDPoll();
     SensorsPoll(g_sensors);
     RFModulePoll();
-    TemperaturePoll();
-    //sleepHandle();
+    testTemperature();
+    //TemperaturePoll();
 }
 

@@ -74,6 +74,7 @@ void HalExtiInitialize(void)
 {
     //SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOB, GPIO_PinSource7 | GPIO_PinSource8 | GPIO_PinSource9);
     GPIO_InitTypeDef GPIO_InitStruct;
+    NVIC_InitTypeDef NVIC_InitStructure;
 
     //PA2\6 Frequency capture pin
     GPIO_InitStruct.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_6;
@@ -83,7 +84,7 @@ void HalExtiInitialize(void)
 
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource2);
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource6);
-
+#if 1
     //433 module wakeup pin 
     GPIO_InitStruct.GPIO_Pin = GPIO_Pin_9;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
@@ -91,20 +92,19 @@ void HalExtiInitialize(void)
     GPIO_Init(GPIOC, &GPIO_InitStruct);
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource9);
 
-    NVIC_InitTypeDef NVIC_InitStructure;
 
     NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn; 
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; 
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; 
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; 
     NVIC_Init(&NVIC_InitStructure); 
+#endif
     
     NVIC_InitStructure.NVIC_IRQChannel = EXTI2_IRQn; 
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; 
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; 
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; 
     NVIC_Init(&NVIC_InitStructure); 
-
 }
 
 void HalExtiPoll(void)

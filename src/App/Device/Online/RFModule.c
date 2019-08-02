@@ -6,6 +6,7 @@
 static bool g_rfModuleDetected = false;
 static uint8_t g_rfRecvBuff[256];
 static uint16_t g_rfBuffCount = 0;
+static volatile bool g_gotFrame = false;
 
 static void rfDataParse(char *cmd)
 {
@@ -31,8 +32,9 @@ static void dataRecvByte(uint8_t byte)
         if(byte == '\r')
         {
             g_rfRecvBuff[g_rfBuffCount] = '\0';
-            rfDataParse((char *)g_rfRecvBuff);
-            g_rfBuffCount = 0;
+            //rfDataParse((char *)g_rfRecvBuff);
+            g_gotFrame = true;
+            //g_rfBuffCount = 0;
         }
 
     }
@@ -100,8 +102,26 @@ static void atcmdRecvByte(uint8_t byte)
         if(byte == '\r')
         {
             g_rfRecvBuff[g_rfBuffCount] = '\0';
+            //atcmdParse((char *)g_rfRecvBuff);
+            g_gotFrame = true;
+        }
+    }
+}
+
+static void frameParsePoll(void)
+{
+    if(g_gotFrame)
+    {
+        if(g_rfModuleDetected)
+        {
+            rfDataParse((char *)g_rfRecvBuff);
+        }
+        else
+        {
             atcmdParse((char *)g_rfRecvBuff);
         }
+        g_gotFrame = false;
+        g_rfBuffCount = 0;
     }
 }
 
@@ -109,6 +129,11 @@ static void uartDataRecv(uint8_t *data, uint16_t len)
 {
     uint8_t i;
     static uint32_t recvTime;
+
+    if(g_gotFrame)
+    {
+        return;
+    }
 
     for(i = 0; i < len; i++)
     {
@@ -229,5 +254,6 @@ void RFModuleInit(void)
 void RFModulePoll(void)
 {
     moduleDetect();
+    frameParsePoll();
 }
 

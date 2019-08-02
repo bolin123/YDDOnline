@@ -11,7 +11,7 @@
 #define      ACCURACY_12           0x7F     
 
 // 温度转换实际时间
-#define      CONVERT_T_9           96   
+#define      CONVERT_T_9           150//96   
 #define      CONVERT_T_10          188   
 #define      CONVERT_T_11          376   
 #define      CONVERT_T_12          760   
@@ -34,8 +34,7 @@
 
 unsigned short TemperatureGetValue(void);
 float TemperatureValueExchange(unsigned short temp);
-void TemperatureInit(void);
-void TemperaturePoll(void);
+void TemperaturePowerOn(void);
 
 #endif
 

@@ -11,35 +11,32 @@
 static int tempReset(void)
 {
     uint8_t retry = 0;
-    TEMP_18B20_DQ_OUTPUT();         //SET PG11 OUTPUT
-    //TEMP_18B20_DQ_SET_LEVEL(1);         //DQ=1 
-    //HalWaitUs(700);
+    TEMP_18B20_DQ_OUTPUT();             //SET PG11 OUTPUT
     TEMP_18B20_DQ_SET_LEVEL(0);         //拉低DQ
-    HalWaitUs(500);            //拉低480us
-    TEMP_18B20_DQ_SET_LEVEL(1);         //DQ=1 
-    HalWaitUs(1);             //15US
-
-    TEMP_18B20_DQ_INPUT();        //SET PG11 INPUT         
-    while (TEMP_18B20_DQ_GET_LEVEL() && retry < 200)
+    HalWaitUs(500);                     //拉低 > 480us 
+    TEMP_18B20_DQ_INPUT();              //SET PG11 INPUT    
+    HalWaitUs(5);
+    while (TEMP_18B20_DQ_GET_LEVEL() && retry < 60)//wait 15~60us
     {
         retry++;
         HalWaitUs(1);
     }       
-    if(retry >= 200)
+    if(retry >= 65)
     {
         return -1;
     }
 
     retry=0;
-    while (!TEMP_18B20_DQ_GET_LEVEL() && retry < 240)
+    while (!TEMP_18B20_DQ_GET_LEVEL() && retry < 250)//wait 60~240
     {
         retry++;
         HalWaitUs(1);
     }
-    if(retry >= 240)
+    if(retry >= 250)
     {
         return -1;
     }            
+    HalWaitUs(5);
     return 0;
 }
 /*
@@ -61,59 +58,109 @@ static uint8_t tempReadByte(void)
 {
     uint8_t mask;
     uint8_t data = 0x00;
-
+    /*
+    * 所有的读时隙必须至少有60us的持续时间
+    * 相邻两个读时隙必须要有最少1us的恢复时间
+    * 所有的读时隙都由拉低总线，持续至少1us后再释放总线
+    */
+#if 1
     for(mask = 0x01; mask != 0; mask <<= 1) 
     {
         TEMP_18B20_DQ_OUTPUT();
         TEMP_18B20_DQ_SET_LEVEL(0); 
-        HalWaitUs(2);
+        HalWaitUs(1);  //t1 > 1us, 至少1us后再释放总线(9.6)
         TEMP_18B20_DQ_INPUT();
-        HalWaitUs(3); 
+        //master sample init, do nothing
+        HalWaitUs(10);  //t2, t1 + t2 <= 15us (18.6)
+
+        //等待数据稳定
+        //HalWaitUs(2); //t3
+        if (TEMP_18B20_DQ_GET_LEVEL())
+        {
+			data |= mask;
+        }
+		else
+		{
+			data  &= ~mask;
+		}
+		HalWaitUs(35); //t4 + t3 >= 45us 
+    }
+#else
+    for(mask = 0x01; mask != 0; mask <<= 1) 
+    {
+        TEMP_18B20_DQ_OUTPUT();
+        TEMP_18B20_DQ_SET_LEVEL(1); 
+        HalWaitUs(5);
+        TEMP_18B20_DQ_SET_LEVEL(0); 
+        HalWaitUs(5);
+        TEMP_18B20_DQ_SET_LEVEL(1); 
+        HalWaitUs(5);
+        TEMP_18B20_DQ_INPUT();
+        HalWaitUs(1); 
         if (TEMP_18B20_DQ_GET_LEVEL())
 			data |= mask;
 		else	
 			data  &= ~mask;
+		TEMP_18B20_DQ_OUTPUT();
+        TEMP_18B20_DQ_SET_LEVEL(1); 
 		HalWaitUs(56);
     }
+#endif
     return data;
 }
 
 static void tempWriteByte(uint8_t cmd)
 {             
     uint8_t i;
-    TEMP_18B20_DQ_OUTPUT();        //SET PG11 OUTPUT;
+    /*
+    * 写时隙必须有最少60us的持续时间(60~120)
+    * 写1时隙，在拉低总线后主机必须在15μs内释放总线|_<15_|
+    * 写0时隙，在拉低总线后主机必须继续拉低总线以满足时隙持续时间的要求(至少60μs)
+    * 相邻两个写时隙必须要有最少1us的恢复时间
+    */
+    TEMP_18B20_DQ_OUTPUT();
     for (i = 0; i < 8; i++) 
     {
-        TEMP_18B20_DQ_SET_LEVEL(1);
-        HalWaitUs(1);   
-        TEMP_18B20_DQ_SET_LEVEL(0);        // Write 1
-        HalWaitUs(2);                            
+        TEMP_18B20_DQ_SET_LEVEL(1); //idle
+        HalWaitUs(1);               //最少1us的恢复时间
+        TEMP_18B20_DQ_SET_LEVEL(0); //start
+        HalWaitUs(3);              //t1 < 15us    
         TEMP_18B20_DQ_SET_LEVEL(cmd & 0x01);
-        HalWaitUs(58); 
+        HalWaitUs(55);              //t2, t1+t2 >= 60us,
         cmd = cmd >> 1;
     }
-    TEMP_18B20_DQ_SET_LEVEL(1);
+    TEMP_18B20_DQ_SET_LEVEL(1); //idle
 }
 
 uint16_t TemperatureGetValue(void)
 {
-    int ret1, ret2;
+#if 1
     uint8_t tl;
     uint16_t value = 0;
+//    int ret1, ret2;
     
-    ret1 = tempReset();
+    tempReset();
     tempWriteByte(0xcc);        // skip rom
     tempWriteByte(0x44);        // convert
     HalWaitUs(CONVERT_T);
-    ret2 = tempReset();
+    //HalWaitMs(1);
+    tempReset();
     tempWriteByte(0xcc);        // skip rom
     tempWriteByte(0xbe);        // convert            
     tl = tempReadByte();         // LSB   
     value = tempReadByte();         // MSB  
     value = (value << 8) + tl;
-    //Syslog("value = %d", value);
-    //printf("ret1=%d, ret2 = %d\n", ret1, ret2);
+    //printf("ret1=%d, ret2=%d\n", ret1, ret2);
     return value;
+    #else
+    uint8_t tl;
+    tempReadByte();
+    //tempWriteByte(0xcc);
+    //tempWriteByte(0xbe);        // convert            
+    //tl = tempReadByte();
+    return 0;
+    
+#endif
 }
 
 float TemperatureValueExchange(uint16_t temp)
@@ -132,7 +179,7 @@ float TemperatureValueExchange(uint16_t temp)
 	return dat;
 }
 
-void TemperatureInit(void)
+void TemperaturePowerOn(void)
 {
     HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT);
     HalGPIOSetLevel(TEMP_18B20_DQ_PIN, 0);
@@ -144,17 +191,11 @@ void TemperatureInit(void)
     tempWriteByte(0xFF);                        //TL
     tempWriteByte(ACCURACY);                        //config寄存器
 
-    tempWriteByte(0x44);                        //启动一次温度转换
+    //tempWriteByte(0x44);                        //启动一次温度转换
+    TemperatureGetValue();
+    TemperatureGetValue();
+    TemperatureGetValue();
 }
 
-void TemperaturePoll(void)
-{
-    static uint32_t oldtime = 0;
 
-    if(SysTimeHasPast(oldtime, 1000))
-    {
-        Syslog("value = %.1f", TemperatureValueExchange(TemperatureGetValue()));
-        oldtime = SysTime();
-    }
-}
 
