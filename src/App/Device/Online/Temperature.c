@@ -132,11 +132,44 @@ static void tempWriteByte(uint8_t cmd)
     TEMP_18B20_DQ_SET_LEVEL(1); //idle
 }
 
+static uint8_t crc1Byte(uint8_t one_byte)      
+{      
+   uint8_t i,crc_one_byte;       
+   crc_one_byte=0;   
+   for(i = 0; i < 8; i++)      
+   {      
+        if(((crc_one_byte^one_byte)&0x01))      
+        {      
+           crc_one_byte^=0x18;       
+           crc_one_byte>>=1;      
+           crc_one_byte|=0x80;      
+        }            
+        else
+        {
+            crc_one_byte>>=1;
+        }
+        one_byte>>=1;            
+    }     
+    return crc_one_byte;     
+}  
+
+static uint8_t crc(uint8_t *p, uint8_t len)    
+{    
+    uint8_t crc=0;    
+    while(len--)  
+    {    
+        crc = crc1Byte(crc^(*p++));    
+    }    
+    return crc;    
+}
+
 uint16_t TemperatureGetValue(void)
 {
 #if 1
     uint8_t tl;
+    uint8_t i;
     uint16_t value = 0;
+    uint8_t data[9];
 //    int ret1, ret2;
     
     tempReset();
@@ -146,14 +179,29 @@ uint16_t TemperatureGetValue(void)
     //HalWaitMs(1);
     tempReset();
     tempWriteByte(0xcc);        // skip rom
-    tempWriteByte(0xbe);        // convert            
+    tempWriteByte(0xbe);        // convert  
+    /*
     tl = tempReadByte();         // LSB   
     value = tempReadByte();         // MSB  
     value = (value << 8) + tl;
-    //printf("ret1=%d, ret2=%d\n", ret1, ret2);
-    return value;
+    */
+    for(i = 0; i < 9; i++)
+    {
+        data[i] = tempReadByte();
+    }
+    if(crc(data, 8) == data[8])
+    {
+        value = data[1];
+        value <<= 8;
+        value |= data[0];
+        
+        return value;
+    }
+    printf("temp crc err!\n");
+    return 0;
     #else
     uint8_t tl;
+    //tempReset();
     tempReadByte();
     //tempWriteByte(0xcc);
     //tempWriteByte(0xbe);        // convert            
@@ -191,10 +239,7 @@ void TemperaturePowerOn(void)
     tempWriteByte(0xFF);                        //TL
     tempWriteByte(ACCURACY);                        //config寄存器
 
-    //tempWriteByte(0x44);                        //启动一次温度转换
-    TemperatureGetValue();
-    TemperatureGetValue();
-    TemperatureGetValue();
+    tempWriteByte(0x44);                        //启动一次温度转换
 }
 
 
