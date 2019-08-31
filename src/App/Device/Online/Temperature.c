@@ -7,7 +7,6 @@
 #define TEMP_18B20_DQ_SET_LEVEL(x) HalGPIOSetLevel(TEMP_18B20_DQ_PIN, x)
 #define TEMP_18B20_DQ_GET_LEVEL() HalGPIOGetLevel(TEMP_18B20_DQ_PIN)
 
-
 static int tempReset(void)
 {
     uint8_t retry = 0;
@@ -166,7 +165,7 @@ static uint8_t crc(uint8_t *p, uint8_t len)
 uint16_t TemperatureGetValue(void)
 {
 #if 1
-    uint8_t tl;
+//    uint8_t tl;
     uint8_t i;
     uint16_t value = 0;
     uint8_t data[9];
@@ -229,6 +228,7 @@ float TemperatureValueExchange(uint16_t temp)
 
 void TemperaturePowerOn(void)
 {
+HalInterruptSet(false);
     HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT);
     HalGPIOSetLevel(TEMP_18B20_DQ_PIN, 0);
     tempReset();
@@ -240,6 +240,12 @@ void TemperaturePowerOn(void)
     tempWriteByte(ACCURACY);                        //config寄存器
 
     tempWriteByte(0x44);                        //启动一次温度转换
+
+    
+    TemperatureGetValue();
+    TemperatureGetValue();
+    TemperatureGetValue();
+HalInterruptSet(true);
 }
 
 

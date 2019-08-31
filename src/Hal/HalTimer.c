@@ -23,6 +23,16 @@ void TIM2_IRQHandler(void)
     }
 }
 
+extern void IRRecvTimerHandle(void);
+void TIM4_IRQHandler(void)
+{ 
+    if(TIM_GetFlagStatus(TIM4, TIM_FLAG_Update) != RESET)
+    {
+        IRRecvTimerHandle();
+        TIM_ClearITPendingBit(TIM4, TIM_FLAG_Update);
+    }
+}
+
 void HalTimerStop(void)
 {
     NVIC_InitTypeDef NVIC_InitStructure;
@@ -80,6 +90,36 @@ void HalLEDUpdateTimerEnable(char enable)
     
 }
 
+void HalIRRecvTimerEnable(char enable)
+{
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    if(enable)
+    {
+        NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+        NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+        NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+        NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+        NVIC_Init(&NVIC_InitStructure);
+
+        TIM_ClearITPendingBit(TIM4, TIM_FLAG_Update);
+        TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+        TIM_Cmd(TIM4, ENABLE);
+    }
+    else
+    {
+        NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+        NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+        NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE;
+        NVIC_Init(&NVIC_InitStructure);
+
+        TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
+        TIM_Cmd(TIM4, DISABLE);
+    }
+    
+}
+
 void HalTimerInitialize(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct;
@@ -96,7 +136,14 @@ void HalTimerInitialize(void)
     TIM_TimeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseInitStruct.TIM_RepetitionCounter = 0;
-    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStruct);    
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStruct);
+
+    TIM_TimeBaseInitStruct.TIM_Prescaler = 72 - 1;
+    TIM_TimeBaseInitStruct.TIM_Period = 100; //100us
+    TIM_TimeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInitStruct.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStruct.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM4, &TIM_TimeBaseInitStruct);
 }
 
 void HalTimerPoll(void)

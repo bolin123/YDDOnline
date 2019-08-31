@@ -1,42 +1,38 @@
 #include "YDDOnline.h"
 #include "Sys.h"
 #include "DigitalLED.h"
-#include "RFModule.h"
+//#include "RFModule.h"
 #include "Sensors.h"
 #include "Sensor/SGeomagnetism.h"
 #include "Sensor/SPress.h"
 #include "Sensor/SNoise.h"
 #include "PowerManager.h"
 #include "Temperature.h"
+#include "Wireless.h"
+#include "DispLoop.h"
+#include "Menu.h"
 
 #define YDD_FALL_SLEEP_DELAY 1000
 
-typedef struct
-{
-    char head;
-    char mac[6];
-    char devType[2];
-    char cmd[2];
-    char dlen[4];
-    char data[];
-}YDDRfData_t;
-
 static Sensors_t *g_sensors = NULL;
 static SensorsContext_t g_sensorContext[HAL_SENSOR_ID_COUNT];
+static bool g_wirelessWakeup = false;
 
-static void yddWakeup(PM_t *pm)
+static void yddWakeup(PM_t *pm, PMWakeupType_t type)
 {
-    //DigitalLEDOn();
     if(pm)
     {
         HalGPIOSetLevel(HAL_LED1_PIN, 0);
+        if(pm->status != PM_STATUS_WAKEUP)
+        {
+            TemperaturePowerOn();
+        }
         
-        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 1);
-        HalGPIOSetLevel(HAL_485_POWER_PIN,     0);
-        HalGPIOSetLevel(HAL_IR_POWER_PIN,      0);
-        TemperaturePowerOn();
-        SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
-        Syslog("");
+        if(type == PM_WAKEUP_TYPE_LIGHT)
+        {
+            DispLoopStart(2);
+        }
+        Syslog("type = %d", type);
         pm->status = PM_STATUS_WAKEUP;
     }
     
@@ -47,94 +43,66 @@ static void yddSleep(PM_t *pm)
     if(pm)
     {
         Syslog("");
-        DigitalLEDOff();
+        DispLoopStop();
+        MenuDeactive();
         HalGPIOSetLevel(HAL_LED1_PIN, 1);
-        
-        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 0);
-        HalGPIOSetLevel(HAL_485_POWER_PIN, 1);
-        HalGPIOSetLevel(HAL_IR_POWER_PIN, 1);
         
         pm->status = PM_STATUS_SLEEP;
     }
-    
-    //RFModuleSleep();
-    //HalCommonFallasleep();
-}
-
-static uint16_t getTemperature(void)
-{
-    uint8_t i, j;
-    uint16_t temp;
-    uint16_t buff[5];
-
-    for(i = 0; i < 5; i++)
-    {
-        buff[i] = TemperatureGetValue();
-        printf("%d\n", buff[i]);
-        HalWaitMs(10);
-    }
-
-    for(i = 0; i < 5 - 1; i++)
-    {
-        for(j = 0; j < 5 - i - 1; j++)
-        {
-            if(buff[i] > buff[i + 1])
-            {
-                temp = buff[i];
-                buff[i] = buff[i + 1];
-                buff[i + 1] = temp;
-            }
-        }
-    }
-
-    return (uint16_t)(TemperatureValueExchange(buff[2]) * 10);
-}
-
-static void reportSensorsValue(SensorsContext_t *context, uint8_t num)
-{
-    //char *buff = "~000012{\"devType\":1,\"values\":[{\"ch1\":[\"856\", \"21\"]},{\"ch2\":[\"546\", \"23\"]},{\"ch3\":[\"123\"]},{\"ch4\":[\"0\"]}]}\r";
-    char buff[255] = {0};
-    uint8_t i;
-    YDDRfData_t *rfdata = (YDDRfData_t *)buff;
-
-    rfdata->head = '~';
-    memcpy(rfdata->mac, SysMacAddrGet(), SYS_MAC_ADDR_LEN);
-    sprintf(rfdata->devType, "%02d", HAL_DEVICE_TYPE);
-    
-    rfdata->cmd[0] = '0'; //update
-    rfdata->cmd[1] = '1'; //update
-    sprintf(rfdata->dlen, "%04d", num * 8);
-    for(i = 0; i < num; i++)
-    {
-        sprintf(&rfdata->data[i*8], "%04d", context[i].amplitude);
-        sprintf(&rfdata->data[i*8 + 4], "%04d", context[i].frequency);
-    }
-    buff[sizeof(YDDRfData_t) + num * 8] = '\r';
-    RFModuleSendData((uint8_t *)buff, strlen(buff));
 }
 
 static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
 {
-    //SensorsContext_t *context;
-    Syslog("event = %d", event);
+    uint8_t i = 0;
+//    uint16_t *data;
+    uint16_t reportData[16];
+    float temperature;
+    //Syslog("event = %d", event);
     if(event == SENSORS_EVENT_SAMPLING_UPDATE)
     {
         if(chn < HAL_SENSOR_ID_COUNT)
         {
             memcpy((void *)&g_sensorContext[chn], args, sizeof(SensorsContext_t));
+            //printf("ch%d: %d, %d\n", chn, g_sensorContext[chn].amplitude, g_sensorContext[chn].frequency);
         }
     }
     else if(event == SENSORS_EVENT_SAMPLING_DONE)
     {
-        if(RFModuleDetected())
-        {
+
         HalInterruptSet(false);
-            printf("temperature = %d\n", getTemperature());
+            temperature = TemperatureValueExchange(TemperatureGetValue());
         HalInterruptSet(true);
-            reportSensorsValue(g_sensorContext, HAL_SENSOR_ID_COUNT);
-            //sleepSet(true, YDD_FALL_SLEEP_DELAY);
-            PMStartSleep(YDD_FALL_SLEEP_DELAY);
-        }
+            printf("temperature=%.1f\n", temperature);
+            
+            reportData[i++] = (uint16_t)(temperature * 10);
+            if(SysDeviceTypeGet() == HAL_DEVICE_TYPE_PRESS)
+            {
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_PRESS1].amplitude;
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_PRESS2].amplitude;
+            }
+            else
+            {
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_GEOMAGNETISM].amplitude;
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_GEOMAGNETISM].frequency;
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_NOISE].amplitude;
+                reportData[i++] = g_sensorContext[HAL_SENSOR_ID_NOISE].frequency;
+            }
+            
+        #if 0
+            data = &reportData[1];
+            for(i = 0; i < HAL_SENSOR_ID_COUNT; i++)
+            {
+                data[i*2] = g_sensorContext[i].amplitude;
+                data[i*2 + 1] = g_sensorContext[i].frequency;
+            }
+        #endif
+           if(g_wirelessWakeup)
+           {
+               WirelessReportData(SysErrorCode(), SysPowerPercent(), reportData, i);
+               g_wirelessWakeup = false;
+           }
+    
+        //PMWakeup();// TODO: test,
     }
 }
 
@@ -143,6 +111,16 @@ void YDDOnlineSensorFreqTrigger(uint8_t ch)
     SensorsFrequencyTrigger(g_sensors, (HalSensorID_t)ch);
 }
 
+
+static void wirelessEventHandle(WirelessEvent_t event, void *args)
+{
+    if(event == WIRELESS_EVENT_QUERY)
+    {
+        g_wirelessWakeup = true;
+        SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+        PMStartSleep(2000);
+    }
+}
 
 static void sensorsHandleInit(Sensors_t *sensors)
 {
@@ -202,55 +180,181 @@ static void yddPowerInit(void)
     PMRegist(&pm, PM_DEVICE_ID_APP);
 }
 
-static void init(void)
+static void sensorsRegist(void)
+{
+    SensorsInitialize(sensorsEventHandle);
+    g_sensors = SensorsCreate();
+    sensorsHandleInit(g_sensors);
+}
+
+static void disploopDoneHandle(void)
+{
+    Syslog("");
+    PMStartSleep(YDD_FALL_SLEEP_DELAY);
+}
+
+static void irKeyEventHandle(IRKey_t key)
+{
+    Syslog("key = %d", key);
+    DispLoopStop();
+    MenuKeyHandle(key);
+    PMStartSleep(30000);//ÎÞ°´¼ü£¬30ÃëºóÐÝÃß
+}
+
+static DispLoopValue_t *disploopGetValue(DispLoopID_t id)
+{
+    static DispLoopValue_t displayValue;
+    DigitalLEDFlag_t flag;
+    uint16_t value;
+    
+    switch (id)
+    {
+    case DISPLOOP_ID_ADDR:
+        flag = DIGITAL_FLAG_A;
+        value = SysRfAddressGet();
+        break;
+    case DISPLOOP_ID_RFCHN:
+        flag = DIGITAL_FLAG_C;
+        value = SysRfChannelGet();
+        break;
+    case DISPLOOP_ID_DEVTYPE:
+        flag = DIGITAL_FLAG_D;
+        value = SysDeviceTypeGet();
+        break;
+    case DISPLOOP_ID_ERRCODE:
+        flag = DIGITAL_FLAG_E;
+        value = SysErrorCode();
+        break;
+    case DISPLOOP_ID_POWER:
+        flag = DIGITAL_FLAG_P;
+        value = SysPowerPercent();
+        break;
+    default:
+        return NULL;
+    }
+
+    displayValue.flag = flag;
+    displayValue.contents[0] = value / 100;
+    displayValue.contents[1] = value % 100 / 10;
+    displayValue.contents[2] = value % 10;
+    return &displayValue;
+}
+
+static void lowInit(void)
 {   
     HalGPIOConfig(HAL_LED1_PIN, HAL_IO_OUTPUT);
     HalGPIOSetLevel(HAL_LED1_PIN, 0);
+    
+    yddPowerInit();
+    sensorsRegist();
+    TemperaturePowerOn();
+}
 
-    HalGPIOConfig(HAL_485_POWER_PIN, HAL_IO_OUTPUT);//pa12
-    HalGPIOSetLevel(HAL_485_POWER_PIN, 1);
+static unsigned short menuGetValue(MenuID_t id)
+{
+    uint16_t value;
+    
+    switch (id)
+    {
+    case MENU_ID_ADDR:
+        value = SysRfAddressGet();
+    break;
+    case MENU_ID_RFCHN:
+        value = SysRfChannelGet();
+    break;
+    case MENU_ID_DEVTYPE:
+        value = SysDeviceTypeGet();
+    break;
+    default:
+    break;
+    }
 
-    HalGPIOConfig(HAL_SENSORS_POWER_PIN, HAL_IO_OUTPUT);//PC13
-    HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 1);
+    return value;
+}
 
-    HalGPIOConfig(HAL_IR_POWER_PIN, HAL_IO_OUTPUT);//PC13
-    HalGPIOSetLevel(HAL_IR_POWER_PIN, 1);
+static void menuSetValue(MenuID_t id, uint16_t value)
+{   
+    Syslog("id = %d, value = %d", id, value);
+    switch (id)
+    {
+    case MENU_ID_ADDR:
+        SysRfAddressSet((uint8_t)value);
+    break;
+    case MENU_ID_RFCHN:
+        SysRfChannelSet((uint8_t)value);
+        WirelessSetChannel((uint8_t)value);
+    break;
+    case MENU_ID_DEVTYPE:
+        SysDeviceTypeSet((HalDeviceType_t)value);
+    break;
+    default:
+    break;
+    }
+}
+
+static void displayInit(void)
+{
+    DigitalLEDInit();
+    DispLoopInit(disploopDoneHandle);
+    DispLoopRegister(DISPLOOP_ID_ADDR,    disploopGetValue);
+    DispLoopRegister(DISPLOOP_ID_RFCHN,   disploopGetValue);
+    DispLoopRegister(DISPLOOP_ID_DEVTYPE, disploopGetValue);
+    DispLoopRegister(DISPLOOP_ID_ERRCODE, disploopGetValue);
+    DispLoopRegister(DISPLOOP_ID_POWER,   disploopGetValue);
+
+    MenuInit();
+    MenuItem_t item;
+    //MENU_ID_ADDR
+    item.flag     = DIGITAL_FLAG_A;
+    item.digitNum = DIGITAL_LED_ID_1;
+    item.step     = 1;
+    item.max      = 254;
+    item.min      = 1;
+    item.getValue = menuGetValue;
+    item.setValue = menuSetValue;
+    MenuRegister(MENU_ID_ADDR, &item);
+
+    //MENU_ID_RFCHN
+    item.flag     = DIGITAL_FLAG_C;
+    item.digitNum = DIGITAL_LED_ID_2;
+    item.step     = 1;
+    item.max      = HAL_RF_CHANNEL_NUM;
+    item.min      = 1;
+    item.getValue = menuGetValue;
+    item.setValue = menuSetValue;
+    MenuRegister(MENU_ID_RFCHN, &item);
+
+    //MENU_ID_DEVTYPE
+    item.flag     = DIGITAL_FLAG_D;
+    item.digitNum = DIGITAL_LED_ID_3;
+    item.step     = 1;
+    item.max      = 2;
+    item.min      = 1;
+    item.getValue = menuGetValue;
+    item.setValue = menuSetValue;
+    MenuRegister(MENU_ID_DEVTYPE, &item);
+    
+    DigitalLEDOn();
+    DispLoopStart(2);
 }
 
 void YDDOnlineInit(void)
 {
-    init();
-    yddPowerInit();
-    DigitalLEDInit();
-    RFModuleInit();
-    SensorsInitialize(sensorsEventHandle);
-    g_sensors = SensorsCreate();
-    sensorsHandleInit(g_sensors);
-
-    DigitalLEDSetChars(DIGITAL_LED_ID_CMD, 0x0E, false);
-    DigitalLEDOn();
-    //PMStartSleep(5000); //test sleep
-}
-
-//extern uint8_t DS18B20ReadTemp(void);
-static void testTemperature(void)
-{
-    static uint32_t oldtime;
-    if(SysTimeHasPast(oldtime, 1000))
-    {
-        HalInterruptSet(false);            
-        printf("temp = %f\n", TemperatureValueExchange(TemperatureGetValue()));
-        HalInterruptSet(true);
-        oldtime = SysTime();
-    }
+    lowInit();
+    displayInit();
+    WirelessInit(wirelessEventHandle);
+    IRInit(irKeyEventHandle);
+    // TODO:test
+    //HalADCStop();// TODO: test,
+    //PMWakeup();// TODO: test,
 }
 
 void YDDOnlinePoll(void)
 {
-    DigitalLEDPoll();
     SensorsPoll(g_sensors);
-    RFModulePoll();
-    testTemperature();
-    //TemperaturePoll();
+    WirelessPoll();
+    DispLoopPoll();
+    MenuPoll();
+    IRPoll();
 }
 

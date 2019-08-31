@@ -88,6 +88,7 @@ void HalUartInitialize(void)
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
     //uart2 io
+    GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_5;  //TX
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;

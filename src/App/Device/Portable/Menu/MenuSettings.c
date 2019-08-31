@@ -13,7 +13,7 @@ typedef enum
 }MSDisplayMenu_t;
 
 static YDDSettingsItemID_t g_settingItemId = YDD_SETTINGS_ITEMID_CSSJ;
-static SysCollectArgs_t g_collectArgs;
+static SysDeviceArgs_t g_collectArgs;
 static const uint16_t CSSJ[MENU_SETTINGS_CSSJ_NUM] = {20, 60, 120, 240, 480, 600, 800, 999};
 static const uint8_t ZLBJ[MENU_SETTINGS_ZLBJ_NUM] = {5, 20, 50, 80, 100, 120, 150, 180, 200};
 //static bool g_argsModified = false;
@@ -419,7 +419,7 @@ static void itemSelectHandle(HalKeyValue_t key)
     //修改flash保存标志位
     if(g_settingItemId < YDD_SETTINGS_ITEMID_CLEAR)
     {
-        SysCollectArgsSet(&g_collectArgs);
+        SysDeviceArgsSet(&g_collectArgs);
     }
 }
 
@@ -465,7 +465,7 @@ void MenuSettingsHide(void)
 /*
     if(g_argsModified)
     {
-        SysCollectArgsSet(&g_collectArgs);
+        SysDeviceArgsSet(&g_collectArgs);
         g_argsModified = false;
     }
     */
@@ -480,7 +480,7 @@ void MenuSettingsShow(void)
     DisplayPictureShow(SYS_PICTURE_SETTING_ID);
 
     /*测试时间*/
-    SysCollectArgsGet(&g_collectArgs);
+    SysDeviceArgsGet(&g_collectArgs);
     buff[0] = '\0';
     sprintf(buff, "%d", g_collectArgs.runTime);
     DiplayStringPrint(buff, strlen(buff), DISPLAY_COLOR_BLACK, &g_settingsPos[i++], DISPLAY_CHAR_SIZE_NORMAL);

@@ -5,6 +5,7 @@ static uint16_t noiseValueExchange(uint16_t value)
     uint32_t result = 0;
     uint32_t mv = value * 3300 / 4096;
 
+    printf("noise = %d\n", value);
     if(mv < 1500)
     {
         result = 0;

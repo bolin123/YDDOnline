@@ -18,16 +18,26 @@ typedef enum
     HAL_SENSOR_ID_COUNT,
 }HalSensorID_t;
 
+typedef enum
+{
+    HAL_DEVICE_TYPE_MASTER = 0, //主机
+    HAL_DEVICE_TYPE_PRESS,      //应力
+    HAL_DEVICE_TYPE_GEO,        //地音地磁
+}HalDeviceType_t;
+
 #define HAL_IO_UART_PIN  0x3c  //模拟串口IO PD12
-#define HAL_LED1_PIN 0x41 //PE1
+#define HAL_LED1_PIN     0x41  //PE1
+
 #define HAL_SENSORS_POWER_PIN 0x2d //PC13
-#define HAL_485_POWER_PIN HAL_IO_INVALID_PIN//0x0c //PA12
-#define HAL_IR_POWER_PIN HAL_IO_INVALID_PIN//0x42
+#define HAL_485_POWER_PIN     0x0c //PA12
+#define HAL_IR_POWER_PIN      0x42
+#define HAL_IR_INPUT_PIN      0x43  //pe3
 
 
 //#define HAL_ADC_CH_NUM 4
 #define HAL_DAC_BASE_VALUE 1830 //1.51, 1.515v = 1892
 #define HAL_DAC_STEP_VALUE 62   //0.05v
+#define HAL_RF_CHANNEL_NUM 29 
 
 #define KB(x) ((x)*1024)
 /*flash分区

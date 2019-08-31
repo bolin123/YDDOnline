@@ -95,13 +95,30 @@ uint16_t HalADCGetPowerValue(void)
 void HalADCStop(void)
 {   
     ADC_SoftwareStartConvCmd(ADC1, DISABLE);
-    DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, DISABLE);
     ADC_DMACmd(ADC1, DISABLE);
+    DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, DISABLE);
+    DMA_Cmd(DMA1_Channel1, DISABLE);
     ADC_Cmd(ADC1, DISABLE);
 }
 
 void HalADCStart(void)
 {
+    HalADCInitialize();
+}
+
+
+void HalADCInitialize(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_7; //pa5 battery voltage
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_4 | GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    GPIO_Init(GPIOC, &GPIO_InitStructure);
+
     ADC_InitTypeDef ADC_InitStructure;
     DMA_InitTypeDef DMA_InitStructure;
 
@@ -169,7 +186,7 @@ void HalADCStart(void)
     //规则模式通道配置
     ADC_RegularChannelConfig(ADC1, ADC_Channel_1,  1, ADC_SampleTime_1Cycles5);//PA1 
     ADC_RegularChannelConfig(ADC1, ADC_Channel_7,  2, ADC_SampleTime_1Cycles5);//PA7 
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 3, ADC_SampleTime_1Cycles5);//PC4 
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 3, ADC_SampleTime_71Cycles5);//PC4 
     ADC_RegularChannelConfig(ADC1, ADC_Channel_15, 4, ADC_SampleTime_71Cycles5);//PC5
     ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 5, ADC_SampleTime_71Cycles5);//PC0
 
@@ -191,21 +208,6 @@ void HalADCStart(void)
      
     //开启ADC1的软件转换
     ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-
-}
-
-
-void HalADCInitialize(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_7; //pa5 battery voltage
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-    
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_4 | GPIO_Pin_5;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
-    GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
 void DMA1_Channel1_IRQHandler(void)

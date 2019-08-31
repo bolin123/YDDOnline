@@ -2,13 +2,28 @@
 #include "Protocol.h"
 #include "W25Q64.h"
 #include "YDDOnline.h"
-//#include "Display.h"
 #include "PowerManager.h"
 
 #define SYS_FIRMWARE_VERSION "1.0.0.1"
 #define SYS_POWER_ADC_NUM 10
+
+typedef struct
+{
+    uint8_t rfAddr;
+    uint8_t rfChnl;
+    uint8_t devType;
+    uint16_t threshold;
+}SysConfig_t;
+
 static uint16_t g_power[SYS_POWER_ADC_NUM];
 static uint16_t g_powerAverage = 0;
+static uint8_t g_errcode;
+static SysConfig_t g_sysConfig;
+
+uint8_t SysErrorCode(void)
+{
+    return g_errcode;
+}
 
 uint8_t SysPowerPercent(void)
 {
@@ -60,52 +75,9 @@ int SysDateTimeSet(SysDateTime_t *dateTime)
     return HalRTCSetTime((HalRTCTime_t *)dateTime);
 }
 
-void SysArgsGetRecord(SysDataRecord_t *record)
+uint16_t SysSignalThresholdGet(void)
 {
-    if(record != NULL)
-    {
-        HalFlashRead(HAL_DATA_RECORD_ADDR, (uint8_t *)record, sizeof(SysDataRecord_t));
-        if(record->num == 0xffff || record->size == 0xffffffff)
-        {
-            record->num = 0;
-            record->size = 0;
-            HalFlashWrite(HAL_DATA_RECORD_ADDR, (const uint8_t *)record, sizeof(SysDataRecord_t));
-        }
-    }
-}
-
-void SysArgsSetRecord(SysDataRecord_t *record)
-{
-    if(record != NULL)
-    {
-        Syslog("num = %d, size = %d", record->num, record->size);
-        HalFlashWrite(HAL_DATA_RECORD_ADDR, (const uint8_t *)record, sizeof(SysDataRecord_t));
-    }
-}
-
-//id start 1,2,3...
-void SysArgsSetPointInfo(uint16_t id, SysDataInfo_t *info)
-{
-    uint32_t addr;
-    //HAL_DATA_POINT_INFO_ADDR
-    if(info != NULL)
-    {
-        Syslog("id = %d, threshold = %d, times = %d, size = %d, address = %d", id, info->threshold, 
-                                                                    info->times, info->size, info->startAddr);
-        addr = HAL_DATA_POINT_INFO_ADDR + ((id - 1) * sizeof(SysDataInfo_t));
-        HalFlashWrite(addr, (const uint8_t *)info, sizeof(SysDataInfo_t));
-    }
-}
-
-void SysArgsGetPointInfo(uint16_t id, SysDataInfo_t *info)
-{
-    uint32_t addr;
-    //HAL_DATA_POINT_INFO_ADDR
-    if(info != NULL)
-    {
-        addr = HAL_DATA_POINT_INFO_ADDR + ((id - 1) * sizeof(SysDataInfo_t));
-        HalFlashRead(addr, (uint8_t *)info, sizeof(SysDataInfo_t));
-    }
+    return g_sysConfig.threshold;
 }
 
 void SysSignalThresholdSet(uint16_t value)
@@ -113,52 +85,42 @@ void SysSignalThresholdSet(uint16_t value)
     //soft step 50, from 50~300
     uint16_t daValue = (value / 50) * HAL_DAC_STEP_VALUE + HAL_DAC_BASE_VALUE;
     HalDACSetValue(daValue);
+
+    g_sysConfig.threshold = value;
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
 }
 
-void SysBeepEnable(bool enable)
+void SysRfAddressSet(uint8_t addr)
 {
-//    HalBeepEnable(enable);
+    g_sysConfig.rfAddr = addr;
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
 }
 
-void SysArgsClear(void)
+uint8_t SysRfAddressGet(void)
 {
-    SysDataRecord_t record;
-
-    Syslog("");
-    record.num = 0;
-    record.size = 0;
-    SysArgsSetRecord(&record);
+    return g_sysConfig.rfAddr;
 }
 
-void SysCollectArgsGet(SysCollectArgs_t *args)
+uint8_t SysRfChannelGet(void)
 {
-    if(args)
-    {
-        HalFlashRead(HAL_DEVICE_ARGS_ADDR, (uint8_t *)args, sizeof(SysCollectArgs_t));
-        if(args->signalThreshold == 0xffff ||
-            args->runTime == 0xffff ||
-            args->intensityAlarm == 0xffff ||
-            args->ringAlarm == 0xffff)
-        {
-            args->beep = 1;
-            args->brightness = 50;
-            args->signalThreshold = 150;
-            args->runTime = 120;
-            args->intensityAlarm = 500;
-            args->ringAlarm = 200;
-            HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)args, sizeof(SysCollectArgs_t));
-        }
-    }
+    return g_sysConfig.rfChnl;
 }
 
-void SysCollectArgsSet(SysCollectArgs_t *args)
+void SysRfChannelSet(uint8_t chnl)
 {
-    if(args)
-    {
-        Syslog("threshold = %d, runTime = %d, alarm = %d, ring = %d", args->signalThreshold, args->runTime, 
-                                                                args->intensityAlarm, args->ringAlarm);
-        HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)args, sizeof(SysCollectArgs_t));
-    }
+    g_sysConfig.rfChnl = chnl;
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+}
+
+void SysDeviceTypeSet(HalDeviceType_t type)
+{
+    g_sysConfig.devType = (uint8_t)type;
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+}
+
+HalDeviceType_t SysDeviceTypeGet(void)
+{
+    return (HalDeviceType_t)g_sysConfig.devType;
 }
 
 void SysRawDataRead(uint32_t addresss, uint8_t *buff, uint16_t length)
@@ -177,46 +139,29 @@ void SysRawDataWrite(uint32_t addresss, uint8_t *buff, uint16_t length)
     }
 }
 
-static uint8_t g_mac[SYS_MAC_ADDR_LEN];
-void SysMacAddrSet(uint8_t *mac)
-{
-    Syslog("");
-    for(int i = 0; i < SYS_MAC_ADDR_LEN; i++)
-    {
-        printf("%02x ", mac[i]);
-    }
-    printf("\n");
-    memcpy(g_mac, mac, SYS_MAC_ADDR_LEN);
-}
-
-uint8_t *SysMacAddrGet(void)
-{
-    return g_mac;
-}
-
 static void startupInit(void)
 {
-    SysDataRecord_t record;
-    SysCollectArgs_t args;
-
-    SysArgsGetRecord(&record);
-    SysCollectArgsGet(&args);
-//    HalBeepEnable(args.beep);
-    SysSignalThresholdSet(args.signalThreshold);
-
+    HalFlashRead(HAL_DEVICE_ARGS_ADDR, (uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+    if(g_sysConfig.rfAddr == 0xFF)
+    {
+        g_sysConfig.rfAddr = 0x01;
+        g_sysConfig.rfChnl = 0x01;
+        g_sysConfig.devType = HAL_DEVICE_TYPE_PRESS;
+        g_sysConfig.threshold = 50;
+        HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+    }
+    
     //log
     printf("\r\n-----------------------------------------------------------\r\n");
     printf("--Firmware version:%s\r\n", SYS_FIRMWARE_VERSION);
-    printf("--Compile date:%s %s\r\n", __DATE__, __TIME__);
-    printf("--Data record: num = %d, size = %d\r\n", record.num, record.size);
-    printf("--XHFZ = %d, CSSJ = %d, QDBJ = %d, ZLBJ = %d\r\n", args.signalThreshold, args.runTime, 
-                                                                args.intensityAlarm, args.ringAlarm);
+    printf("--Device type:%d, threshold = %d\r\n", g_sysConfig.devType, g_sysConfig.threshold);
+    printf("--Rf address:%d, channel:%d\r\n", g_sysConfig.rfAddr, g_sysConfig.rfChnl);
     SysDateTime_t *time = SysDateTime();
     printf("--Now: %d-%02d-%02d %02d:%02d:%02d\r\n", time->year, time->month, time->day, 
                                           time->hour, time->minute, time->second);
+    printf("--Compile date:%s %s\r\n", __DATE__, __TIME__);
     printf("-----------------------------------------------------------\r\n");
     
-//    HalBeepSet(100);
 }
 
 void SysReboot(void)
@@ -227,26 +172,20 @@ void SysReboot(void)
 
 void SysInitalize(void)
 {
-    uint16_t errcode;
-    errcode = HalCommonInitialize();
-    //ProtocolInitialize();
+    g_errcode = HalCommonInitialize();
     printf(".....Hardware init....\n");
-    errcode |= W25Q64Initialize();
-    printf("errcode = %d\r\n", errcode);
-    //YDDInitialize(errcode);
+    g_errcode |= W25Q64Initialize();
+    printf("errcode = %d\r\n", g_errcode);
+    startupInit();
     PMInit();
     YDDOnlineInit();
-    startupInit();
 }
 
 extern void TestCollectPoll(void);
 void SysPoll(void)
 {
     HalCommonPoll();
-    //ProtocolPoll();
     W25Q64Poll();
-    //TestCollectPoll();
-    //YDDPoll();
     PMPoll();
     YDDOnlinePoll();
     powerValueUpdate();

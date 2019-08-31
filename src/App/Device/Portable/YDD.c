@@ -79,7 +79,7 @@ static void collectDisplayShow(void)
 static void yddKeyEventHandle(uint8_t keyval, KeyStatus_t status, bool longpress, uint32_t lastTime)
 {
     SysDataRecord_t record;
-    SysCollectArgs_t args;
+    SysDeviceArgs_t args;
     HalKeyValue_t value = (HalKeyValue_t)keyval;
 
     if(lastTime > 20)//·À¶¶
@@ -116,7 +116,7 @@ static void yddKeyEventHandle(uint8_t keyval, KeyStatus_t status, bool longpress
                 {
                     g_menuHandle[g_menuId].hide();
                     SysArgsGetRecord(&record);
-                    SysCollectArgsGet(&args);
+                    SysDeviceArgsGet(&args);
                     g_lastCollectNum = args.runTime;
                     SensorsSamplingStart(g_sensors, args.runTime, record.size);
                     collectDisplayShow();
@@ -190,10 +190,10 @@ static void updateSysArgs(Sensors_t *sensors)
     //...update record & args
     SysDataRecord_t record;
     SysDataInfo_t info;
-    SysCollectArgs_t args;
+    SysDeviceArgs_t args;
     
     SysArgsGetRecord(&record);
-    SysCollectArgsGet(&args);
+    SysDeviceArgsGet(&args);
     info.size = args.runTime * HAL_SENSOR_ID_COUNT * sizeof(SensorsContext_t);
     info.threshold = args.signalThreshold;
     info.times = args.runTime;
@@ -209,7 +209,7 @@ static void updateSysArgs(Sensors_t *sensors)
 static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
 {
     SensorsContext_t *context;
-    SysCollectArgs_t cargs;
+    SysDeviceArgs_t cargs;
     if(event == SENSORS_EVENT_SAMPLING_DONE)
 
     {
@@ -220,7 +220,7 @@ static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
     else if(event == SENSORS_EVENT_SAMPLING_UPDATE)
     {
         context = (SensorsContext_t *)args;
-        SysCollectArgsGet(&cargs);
+        SysDeviceArgsGet(&cargs);
         if(chn != 3 && (context->amplitude >= cargs.intensityAlarm || context->frequency >= cargs.ringAlarm * 10))
         {
             HalBeepSet(100);

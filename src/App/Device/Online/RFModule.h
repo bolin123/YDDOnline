@@ -1,12 +1,11 @@
 #ifndef RFMODULE_H
 #define RFMODULE_H
 
-#include "Sys.h"
-
-void RFModuleSendData(uint8_t *data, uint16_t len);
+void RFModuleSendData(unsigned char *data, unsigned short len);
 void RFModuleSleep(void);
 void RFModuleWakeup(void);
-bool RFModuleDetected(void);
+void RFMoudleSetChannel(unsigned char chn);
+unsigned char RFModuleDetected(void);
 void RFModuleInit(void);
 void RFModulePoll(void);
 #endif

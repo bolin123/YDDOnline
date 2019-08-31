@@ -27,8 +27,8 @@ void MenuDetailShow(void)
     DiplayStringPrint(buff, strlen(buff), DISPLAY_COLOR_BLACK, &g_detailsPos[i++], DISPLAY_CHAR_SIZE_NORMAL);
     
     /*–≈∫≈„–÷µ*/
-    SysCollectArgs_t args;
-    SysCollectArgsGet(&args);
+    SysDeviceArgs_t args;
+    SysDeviceArgsGet(&args);
     buff[0] = '\0';
     sprintf(buff, "%d", args.signalThreshold);
     DiplayStringPrint(buff, strlen(buff), DISPLAY_COLOR_BLACK, &g_detailsPos[i++], DISPLAY_CHAR_SIZE_NORMAL);

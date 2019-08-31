@@ -1,42 +1,16 @@
 #include "DigitalLED.h"
+#include "PowerManager.h"
 
-static uint8_t g_segCode[] = {0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71};
+static uint8_t g_segCode[] = { 
+            0x3f, 0x06, 0x5b, 0x4f, 0x66,
+            0x6d, 0x7d, 0x07, 0x7f, 0x6f,
+            0x77, 0x7c, 0x39, 0x5e, 0x79, 
+            0x71, 0x76, 0x38, 0x54, 0x73,
+            0x77, 0x6D, 0x3E, 0x00};
 static uint8_t g_segPin[] = {0x33, 0x16, 0x2c, 0x31, 0x32, 0x34, 0x2b, 0x30};
 static uint8_t g_digPin[DIGITAL_LED_ID_COUNT] = {0x40, 0x19, 0x18, 0x17};
 static uint8_t g_charValue[DIGITAL_LED_ID_COUNT];
 //static bool g_ledOn = false;
-
-#if 0
-static void ledDisplayUpdate(void)
-{
-    uint8_t i, value;
-    bool point = false;
-    static uint8_t displayPos = 0;
-    static uint32_t oldTime;
-    
-    if(g_ledOn && SysTimeHasPast(oldTime, 2))
-    {
-        for(i = 0; i < DIGITAL_LED_ID_COUNT; i++)
-        {
-            HalGPIOSetLevel(g_digPin[i], i == displayPos);//en
-        }
-
-        value = g_segCode[g_charValue[displayPos] & 0x7f];
-        point = g_charValue[displayPos] & 0x80;
-        for(i = 0; i < sizeof(g_segPin); i++)
-        {
-            HalGPIOSetLevel(g_segPin[i], (value & (0x80 >> i)) != 0);
-        }
-        HalGPIOSetLevel(g_segPin[0], point == 0x80);
-        displayPos++;
-        if(displayPos >= DIGITAL_LED_ID_COUNT)
-        {
-            displayPos = 0;
-        }
-        oldTime = SysTime();
-    }
-}
-#endif
 
 void DigitalLEDScan(void)
 {
@@ -74,7 +48,6 @@ void DigitalLEDSetChars(DigitalLEDId_t id, uint8_t value, bool point)
 
 void DigitalLEDOn(void)
 {
-    //g_ledOn = true;
     HalLEDUpdateTimerEnable(true);
 }
 
@@ -93,10 +66,44 @@ void DigitalLEDOff(void)
     }
 }
 
+static void ledPMSleep(PM_t *pm)
+{
+    if(pm)
+    {
+        DigitalLEDOff();
+        HalGPIOSetLevel(HAL_IR_POWER_PIN, 1); //power off
+        pm->status = PM_STATUS_SLEEP;
+    }
+}
+
+static void ledPMWakeup(PM_t *pm, PMWakeupType_t type)
+{
+    if(pm && type == PM_WAKEUP_TYPE_LIGHT) //光照才打开遥控和数码管电源
+    {
+        HalGPIOSetLevel(HAL_IR_POWER_PIN, 0); //power on
+        DigitalLEDOn();
+        pm->status = PM_STATUS_WAKEUP;
+    }
+}
+
+static void ledPMRegist(void)
+{
+    PM_t pm;
+
+    pm.enable = true;
+    pm.status = PM_STATUS_WAKEUP;
+    pm.sleep = ledPMSleep;
+    pm.wakeup = ledPMWakeup;
+    PMRegist(&pm, PM_DEVICE_ID_LED);
+}
+
+
 void DigitalLEDInit(void)
 {
 
     uint8_t i;
+    HalGPIOConfig(HAL_IR_POWER_PIN, HAL_IO_OUTPUT);//PC13
+    HalGPIOSetLevel(HAL_IR_POWER_PIN, 0);//enable
 
     for(i = 0; i < sizeof(g_digPin); i++)
     {
@@ -109,10 +116,6 @@ void DigitalLEDInit(void)
         HalGPIOConfig(g_segPin[i], HAL_IO_OUTPUT);
         HalGPIOSetLevel(g_segPin[i], 0);
     }
-}
-
-void DigitalLEDPoll(void)
-{
-//    ledDisplayUpdate();
+		ledPMRegist();
 }
 

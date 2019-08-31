@@ -3,6 +3,7 @@
 
 #include "HalCtype.h"
 
+void HalExtiIRRecvEnable(bool enable);
 void HalExtiWakeupSet(bool enable);
 void HalExtiFreqStart(void);
 void HalExtiFreqStop(void);

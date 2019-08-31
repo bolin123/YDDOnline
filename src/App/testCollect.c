@@ -51,8 +51,8 @@ void TestCollectInit(void)
     info.date.second = 39;
     SysArgsSetPointInfo(1, &info);
 #endif
-    SysCollectArgs_t args;
-    SysCollectArgsGet(&args);
+    SysDeviceArgs_t args;
+    SysDeviceArgsGet(&args);
     Syslog(" threshold:%d, intensityAlarm:%d, ringAlarm:%d, runTime:%d", args.signalThreshold, args.intensityAlarm, args.ringAlarm, args.runTime);
 }
 

@@ -4,6 +4,8 @@ static uint16_t geomagnetismValueExchange(uint16_t value)
 {
     uint32_t result = 0;
     uint32_t mv = value * 3300 / 4096;
+    
+    printf("geo = %d\n", value);
 
     if(mv < 1500)
     {

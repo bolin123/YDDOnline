@@ -143,17 +143,15 @@ static void sensorsSleep(PM_t *pm)
     {
         HalADCStop();
         HalDACEnable(false);
-        //W25Q64PowerDown();
         pm->status = PM_STATUS_SLEEP;
     }
 }
 
-static void sensorsWakeup(PM_t *pm)
+static void sensorsWakeup(PM_t *pm, PMWakeupType_t type)
 {
     
     if(pm)
     {
-        //W25Q64Wakeup();
         HalADCStart();
         HalDACEnable(true);
         pm->status = PM_STATUS_WAKEUP;

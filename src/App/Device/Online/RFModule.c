@@ -1,17 +1,33 @@
 #include "RFModule.h"
+#include "Wireless.h"
 #include "PowerManager.h"
+#include "VTList.h"
+#include "VTStaticQueue.h"
 
 #define RFMODULE_UART_PORT HAL_UART_PORT_3 //uart3
+#define RFMODULE_REPLY_TIMEOUT 300
+#define RFMODULE_RETRY_MAX_NUM 5
+
+typedef enum
+{
+    RFMODULE_CMD_DETECT = 0,
+    RFMODULE_CMD_RFCHN,
+}RFModuleCmd_t;
+
+typedef struct RFSendList_st
+{
+    uint8_t retries;
+    RFModuleCmd_t cmd;
+    char *data;
+    uint32_t lastTime;
+    VTLIST_ENTRY(struct RFSendList_st);
+}RFModuleSendList_t;
 
 static bool g_rfModuleDetected = false;
 static uint8_t g_rfRecvBuff[256];
 static uint16_t g_rfBuffCount = 0;
-static volatile bool g_gotFrame = false;
-
-static void rfDataParse(char *cmd)
-{
-    Syslog("%s", cmd);
-}
+static VTSQueueDef(uint8_t, g_uartBuff, 512);
+static RFModuleSendList_t g_rfmoduleList;
 
 static void dataRecvByte(uint8_t byte)
 {   
@@ -32,34 +48,107 @@ static void dataRecvByte(uint8_t byte)
         if(byte == '\r')
         {
             g_rfRecvBuff[g_rfBuffCount] = '\0';
-            //rfDataParse((char *)g_rfRecvBuff);
-            g_gotFrame = true;
-            //g_rfBuffCount = 0;
+            WirelessDataParse((char *)g_rfRecvBuff);
+            g_rfBuffCount = 0;
         }
 
     }
 }
 
+static int sendlistInsert(char *data, RFModuleCmd_t cmd)
+{
+    RFModuleSendList_t *rfsend = (RFModuleSendList_t *)malloc(sizeof(RFModuleSendList_t));
+
+    if(rfsend)
+    {
+        rfsend->data = (char *)malloc(strlen(data) + 1);
+        if(rfsend->data)
+        {
+            memset(rfsend->data, 0, strlen(data) + 1);
+            strcpy(rfsend->data, data);
+            rfsend->cmd = cmd;
+            rfsend->lastTime = 0;
+            rfsend->retries = 0;
+            VTListAdd(&g_rfmoduleList, rfsend);
+            return 0;
+        }
+        else
+        {
+            free(rfsend);
+        }
+    }
+    return -1;
+}
+
+static void sendlistDel(RFModuleSendList_t *node)
+{
+    if(node)
+    {
+        VTListDel(node);
+        if(node->data)
+        {
+            free(node->data);
+        }
+        free(node);
+    }
+}
+
+static void rfSendlistHandle(void)
+{
+    RFModuleSendList_t *rfsend = VTListFirst(&g_rfmoduleList);
+    if(rfsend != NULL)
+    {
+        if(SysTimeHasPast(rfsend->lastTime, RFMODULE_REPLY_TIMEOUT))
+        {
+            if(rfsend->retries < RFMODULE_RETRY_MAX_NUM)
+            {
+                HalUartWrite(RFMODULE_UART_PORT, (const uint8_t *)rfsend->data, strlen(rfsend->data));
+                rfsend->retries++;
+                rfsend->lastTime = SysTime();
+            }
+            else //out of range
+            {
+                sendlistDel(rfsend);
+            }
+        }
+    }
+}
+
 static void atcmdParse(char *atcmd)
 {
-    uint8_t i;
-    uint8_t mac[SYS_MAC_ADDR_LEN];
-    char *macstr = &atcmd[72];
-    char tmp[3] = {0};
-
+    RFModuleSendList_t *rfsend;
     Syslog("%s", atcmd);
 
-    //memcpy(macstr, &atcmd[72], 12);
-    
-    //sscanf(macstr, "%02x%02x%02x%02x%02x%02x", &mac[0],  &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
-    for(i = 0; i < SYS_MAC_ADDR_LEN; i++)
+    if(strstr(atcmd, "ATCi"))
     {
-        memcpy(tmp, macstr + i * 2, 2);
-        mac[i] = (uint8_t)strtol(tmp, NULL, 16);
+    /*
+        for(i = 0; i < SYS_MAC_ADDR_LEN; i++)
+        {
+            memcpy(tmp, macstr + i * 2, 2);
+            mac[i] = (uint8_t)strtol(tmp, NULL, 16);
+        }
+        
+        SysMacAddrSet(mac);
+    */
+        g_rfModuleDetected = true;
+        rfsend = VTListFirst(&g_rfmoduleList);
+        if(rfsend && rfsend->cmd == RFMODULE_CMD_DETECT)
+        {
+            sendlistDel(rfsend);
+        }
     }
-    
-    SysMacAddrSet(mac);
-    g_rfModuleDetected = true;
+    else if(strstr(atcmd, "ATOK"))
+    {
+        rfsend = VTListFirst(&g_rfmoduleList);
+        if(rfsend && rfsend->cmd == RFMODULE_CMD_RFCHN)
+        {
+            sendlistDel(rfsend);
+        }
+    }
+    else
+    {
+        //ignore
+    }
 }
 
 static void atcmdRecvByte(uint8_t byte)
@@ -78,20 +167,6 @@ static void atcmdRecvByte(uint8_t byte)
             g_rfBuffCount = 0;
         }
     }
-    else if(g_rfBuffCount == 3)
-    {
-        if(byte != 'C')
-        {
-            g_rfBuffCount = 0;
-        }
-    }
-    else if(g_rfBuffCount == 4)
-    {
-        if(byte != 'i')
-        {
-            g_rfBuffCount = 0;
-        }
-    }
     else
     {
         if(g_rfBuffCount >= sizeof(g_rfRecvBuff))
@@ -102,54 +177,64 @@ static void atcmdRecvByte(uint8_t byte)
         if(byte == '\r')
         {
             g_rfRecvBuff[g_rfBuffCount] = '\0';
-            //atcmdParse((char *)g_rfRecvBuff);
-            g_gotFrame = true;
+            atcmdParse((char *)g_rfRecvBuff);
+            g_rfBuffCount = 0;
+        }
+    }
+}
+
+static void uartDataRecv(uint8_t *data, uint16_t len)
+{
+    uint16_t i;
+    for(i = 0; i < len; i++)
+    {
+        if(VTSQueueHasSpace(g_uartBuff))
+        {
+            VTSQueuePush(g_uartBuff, data[i]);
         }
     }
 }
 
 static void frameParsePoll(void)
 {
-    if(g_gotFrame)
-    {
-        if(g_rfModuleDetected)
-        {
-            rfDataParse((char *)g_rfRecvBuff);
-        }
-        else
-        {
-            atcmdParse((char *)g_rfRecvBuff);
-        }
-        g_gotFrame = false;
-        g_rfBuffCount = 0;
-    }
-}
-
-static void uartDataRecv(uint8_t *data, uint16_t len)
-{
-    uint8_t i;
+//    uint8_t i;
+    uint8_t data;
     static uint32_t recvTime;
-
-    if(g_gotFrame)
+    static bool atcmdRecved = false;
+    
+    while(VTSQueueCount(g_uartBuff))
     {
-        return;
-    }
-
-    for(i = 0; i < len; i++)
-    {
-        if(SysTimeHasPast(recvTime, 200))
+        HalInterruptSet(false);
+        data = VTSQueueFront(g_uartBuff);
+        HalInterruptSet(true);
+        VTSQueuePop(g_uartBuff);
+        if(SysTimeHasPast(recvTime, 100))
         {
-            g_rfBuffCount = 0; 
+            g_rfBuffCount = 0;
         }
         recvTime = SysTime();
-        g_rfRecvBuff[g_rfBuffCount++] = data[i];
-        if(g_rfModuleDetected)
+
+        g_rfRecvBuff[g_rfBuffCount++] = data;
+
+        if(g_rfBuffCount == 1)
         {
-            dataRecvByte(data[i]);
+            if(data == '~')
+            {
+                atcmdRecved = false;
+            }
+            else
+            {
+                atcmdRecved = true;
+            }
+        }
+        
+        if(atcmdRecved)
+        {
+            atcmdRecvByte(data);
         }
         else
         {
-            atcmdRecvByte(data[i]);
+            dataRecvByte(data);
         }
     }
 }
@@ -176,6 +261,7 @@ static void uartDeinit(void)
     HalUartConfig(RFMODULE_UART_PORT, &config);
 }
 
+/*
 static void moduleDetect(void)
 {
     char *getId = "ATCi\r";
@@ -186,6 +272,13 @@ static void moduleDetect(void)
         HalUartWrite(RFMODULE_UART_PORT, (const uint8_t *)getId, strlen(getId));
         getidTime = SysTime();
     }
+}
+*/
+
+static void rfModuleDetect(void)
+{
+    char *getId = "ATCi\r";
+    sendlistInsert(getId, RFMODULE_CMD_DETECT);
 }
 
 void RFModuleSendData(uint8_t *data, uint16_t len)
@@ -201,36 +294,63 @@ bool RFModuleDetected(void)
 {
     return g_rfModuleDetected;
 }
-/*
 
-void RFModuleSleep(void)
-{
-    uartDeinit();
+void RFMoudleSetChannel(uint8_t chn)
+{   
+    uint8_t rfchnl = chn - 1;
+    char *chnlist[HAL_RF_CHANNEL_NUM] = {
+                        "ATCM002BC88E10\r",  //430.5
+                        "ATCM002B9E9810\r",  //431.5
+                        "ATCM002B77A210\r",  //432.5
+                        "ATCM002B50AC10\r",  //433.5
+                        "ATCM002B29B610\r",  //434.5
+                        "ATCM002B00C010\r",  //435.5
+                        "ATCM002BD9C910\r",  //436.5
+                        "ATCM002BB2D310\r",  //437.5
+                        "ATCM002B8BDD10\r",  //438.5
+                        "ATCM002B64E710\r",  //439.5
+                        "ATCM002B3DF110\r",  //440.5
+                        "ATCM002B16FB10\r",  //441.5
+                        "ATCM002BEF0411\r",  //442.5
+                        "ATCM002BC80E11\r",  //443.5
+                        "ATCM002BA11811\r",  //444.5
+                        "ATCM002B762211\r",  //445.5
+                        "ATCM002BB35311\r",  //450.5
+                        "ATCM002B8C5D11\r",  //451.5
+                        "ATCM002B656711\r",  //452.5
+                        "ATCM002B3E7111\r",  //453.5
+                        "ATCM002B177B11\r",  //454.5
+                        "ATCM002BF08411\r",  //455.5
+                        "ATCM002B2BB611\r",  //460.5
+                        "ATCM002B66E711\r",  //465.5
+                        "ATCM002BA11812\r",  //470.5
+                        "ATCM002BDCC90F\r",  //410.5
+                        "ATCM002B17FB0F\r",  //415.5
+                        "ATCM002B522C10\r",  //420.5
+                        "ATCM002B8D5D10\r",  //425.5
+                        };
 
+    Syslog("%d", chn);
+    if(rfchnl < HAL_RF_CHANNEL_NUM)
+    {
+        sendlistInsert(chnlist[rfchnl], RFMODULE_CMD_RFCHN);
+    }
 }
-
-void RFModuleWakeup(void)
-{
-    uartInit();
-}
-*/
 
 static void rfModuleSleep(PM_t *pm)
 {
     if(pm)
     {
         uartDeinit();
-        //HalExtiWakeupSet(true);
         pm->status = PM_STATUS_SLEEP;
     }
 }
 
-static void rfModuleWakeup(PM_t *pm)
+static void rfModuleWakeup(PM_t *pm, PMWakeupType_t type)
 {
     if(pm)
     {
         uartInit();
-        //HalExtiWakeupSet(false);
         pm->status = PM_STATUS_WAKEUP;
     }
 }
@@ -249,11 +369,12 @@ void RFModuleInit(void)
     uartInit();
     HalExtiWakeupSet(true);
     rfModulePowerInit();
+    rfModuleDetect();
 }
 
 void RFModulePoll(void)
 {
-    moduleDetect();
+    rfSendlistHandle();
     frameParsePoll();
 }
 

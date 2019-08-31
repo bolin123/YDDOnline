@@ -52,11 +52,36 @@ void HalInterruptSet(bool enable)
     }
 }
 
+static void periphClockInit(bool enable)
+{
+    FunctionalState state = enable ? ENABLE : DISABLE;
+    
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOE, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, state);
+    //RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, state);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC , state);
+}
+
 void HalCommonWakeup(void)
 {
     SystemInit();
-    HalExtiWakeupSet(false);
+    periphClockInit(true);
     HalTimerStart();
+    HalExtiWakeupSet(false);
     HalExtiFreqStart();
     W25Q64Wakeup();
 }
@@ -67,7 +92,6 @@ void HalCommonFallasleep(void)
     HalExtiFreqStop();
     HalTimerStop();
     HalExtiWakeupSet(true);
-    //HalADCStop();
 #if 1
     PWR_EnterSTOPMode(PWR_Regulator_LowPower, PWR_STOPEntry_WFI);
     /*
@@ -80,51 +104,15 @@ void HalCommonFallasleep(void)
 #endif
 }
 
-static void periphClockInit(void)
-{
-    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOE, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
-    //RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
-    
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC , ENABLE);
-}
-
 void HalCommonReboot(void)
 {
     __set_FAULTMASK(1); //ÖÕÖ¹ËùÓÐÖÐ¶Ï
     NVIC_SystemReset();
 }
-/*
-static void testPrint(void)
-{
-    static uint32_t lastTime = 0;
-    HalRTCTime_t *time;
 
-    if(g_sysTimeCount - lastTime > 1000)
-    {
-        time = HalRTCGetTime();
-        printf("%04d-%02d-%02d %02d:%02d:%02d\n", time->year, time->month, time->day, time->hour, time->minute, time->second);
-        lastTime = g_sysTimeCount;
-    }
-}
-*/
 static void halInit(void)
 {
     HalGPIOConfig(HAL_IO_UART_PIN, HAL_IO_OUTPUT);    
-    //HalCommonWakeup();
-    HalExtiWakeupSet(false);
     HalTimerStart();
     HalExtiFreqStart(); 
 }
@@ -133,7 +121,7 @@ uint16_t HalCommonInitialize(void)
 {
     uint16_t err;
     SystemInit();
-    periphClockInit();
+    periphClockInit(true);
     HalGPIOInitialize();
     HalUartInitialize();
     HalTimerInitialize();
@@ -141,6 +129,7 @@ uint16_t HalCommonInitialize(void)
     HalADCInitialize();
     HalDACInitialize();
     HalExtiInitialize();
+    HalPWMInit();
     err = HalRTCInit();
     halInit();
     return err;

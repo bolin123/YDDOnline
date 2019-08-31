@@ -124,8 +124,8 @@ void DisplayInitialize(void)
     //DisplayPowerPercent(50);
     //DisplayDateTimeUpdate();
     
-    SysCollectArgs_t args;
-    SysCollectArgsGet(&args);
+    SysDeviceArgs_t args;
+    SysDeviceArgsGet(&args);
     DisplayBrightnessSet(args.brightness);
 }
 
