@@ -436,6 +436,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\src\Hal\HalWait.c</FilePath>
             </File>
+            <File>
+              <FileName>HalPWM.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\Hal\HalPWM.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -497,9 +502,24 @@
               <FilePath>..\..\src\App\Device\Online\Temperature.c</FilePath>
             </File>
             <File>
-              <FileName>DS18B20.c</FileName>
+              <FileName>Wireless.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\src\App\DS18B20.c</FilePath>
+              <FilePath>..\..\src\App\Device\Online\Wireless.c</FilePath>
+            </File>
+            <File>
+              <FileName>IR.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\IR.c</FilePath>
+            </File>
+            <File>
+              <FileName>DispLoop.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\DispLoop.c</FilePath>
+            </File>
+            <File>
+              <FileName>Menu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\Menu.c</FilePath>
             </File>
           </Files>
         </Group>
