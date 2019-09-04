@@ -10,8 +10,8 @@
 
 typedef enum
 {
-    RFMODULE_CMD_DETECT = 0,
-    RFMODULE_CMD_RFCHN,
+    RFMODULE_CMD_GET_RFCHN = 0,
+    RFMODULE_CMD_SET_RFCHN,
 }RFModuleCmd_t;
 
 typedef struct RFSendList_st
@@ -23,11 +23,45 @@ typedef struct RFSendList_st
     VTLIST_ENTRY(struct RFSendList_st);
 }RFModuleSendList_t;
 
+static const char *g_chnlist[HAL_RF_CHANNEL_NUM] = {
+                    "ATCM002BC88E10\r",  //430.5
+                    "ATCM002B9E9810\r",  //431.5
+                    "ATCM002B77A210\r",  //432.5
+                    "ATCM002B50AC10\r",  //433.5
+                    "ATCM002B29B610\r",  //434.5
+                    "ATCM002B00C010\r",  //435.5
+                    "ATCM002BD9C910\r",  //436.5
+                    "ATCM002BB2D310\r",  //437.5
+                    "ATCM002B8BDD10\r",  //438.5
+                    "ATCM002B64E710\r",  //439.5
+                    "ATCM002B3DF110\r",  //440.5
+                    "ATCM002B16FB10\r",  //441.5
+                    "ATCM002BEF0411\r",  //442.5
+                    "ATCM002BC80E11\r",  //443.5
+                    "ATCM002BA11811\r",  //444.5
+                    "ATCM002B762211\r",  //445.5
+                    "ATCM002BB35311\r",  //450.5
+                    "ATCM002B8C5D11\r",  //451.5
+                    "ATCM002B656711\r",  //452.5
+                    "ATCM002B3E7111\r",  //453.5
+                    "ATCM002B177B11\r",  //454.5
+                    "ATCM002BF08411\r",  //455.5
+                    "ATCM002B2BB611\r",  //460.5
+                    "ATCM002B66E711\r",  //465.5
+                    "ATCM002BA11812\r",  //470.5
+                    "ATCM002BDCC90F\r",  //410.5
+                    "ATCM002B17FB0F\r",  //415.5
+                    "ATCM002B522C10\r",  //420.5
+                    "ATCM002B8D5D10\r",  //425.5
+};
+
+
 static bool g_rfModuleDetected = false;
 static uint8_t g_rfRecvBuff[256];
 static uint16_t g_rfBuffCount = 0;
 static VTSQueueDef(uint8_t, g_uartBuff, 512);
 static RFModuleSendList_t g_rfmoduleList;
+static RFModuleEvent_cb g_rfModuleEventHandle;
 
 static void dataRecvByte(uint8_t byte)
 {   
@@ -118,29 +152,30 @@ static void atcmdParse(char *atcmd)
 {
     RFModuleSendList_t *rfsend;
     Syslog("%s", atcmd);
+    
+    g_rfModuleDetected = true;
 
-    if(strstr(atcmd, "ATCi"))
+    if(strstr(atcmd, "ATCb"))
     {
-    /*
-        for(i = 0; i < SYS_MAC_ADDR_LEN; i++)
-        {
-            memcpy(tmp, macstr + i * 2, 2);
-            mac[i] = (uint8_t)strtol(tmp, NULL, 16);
-        }
-        
-        SysMacAddrSet(mac);
-    */
-        g_rfModuleDetected = true;
         rfsend = VTListFirst(&g_rfmoduleList);
-        if(rfsend && rfsend->cmd == RFMODULE_CMD_DETECT)
+        if(rfsend && rfsend->cmd == RFMODULE_CMD_GET_RFCHN)
         {
+            char *chnl = &atcmd[4];
+            for(uint32_t i = 0; i < HAL_RF_CHANNEL_NUM; i++)
+            {
+                if(strstr(g_chnlist[i], chnl))
+                {
+                    g_rfModuleEventHandle(RFMODULE_EVENT_GET_RFCHNL, (void *)(i + 1));
+                    break;
+                }
+            }
             sendlistDel(rfsend);
         }
     }
     else if(strstr(atcmd, "ATOK"))
     {
         rfsend = VTListFirst(&g_rfmoduleList);
-        if(rfsend && rfsend->cmd == RFMODULE_CMD_RFCHN)
+        if(rfsend && rfsend->cmd == RFMODULE_CMD_SET_RFCHN)
         {
             sendlistDel(rfsend);
         }
@@ -261,24 +296,10 @@ static void uartDeinit(void)
     HalUartConfig(RFMODULE_UART_PORT, &config);
 }
 
-/*
-static void moduleDetect(void)
+void RFModuleGetChannel(void)
 {
-    char *getId = "ATCi\r";
-    static uint32_t getidTime;
-    if(!g_rfModuleDetected && SysTimeHasPast(getidTime, 500))
-    {
-        Syslog("");
-        HalUartWrite(RFMODULE_UART_PORT, (const uint8_t *)getId, strlen(getId));
-        getidTime = SysTime();
-    }
-}
-*/
-
-static void rfModuleDetect(void)
-{
-    char *getId = "ATCi\r";
-    sendlistInsert(getId, RFMODULE_CMD_DETECT);
+    char *getId = "ATCb002B03\r";
+    sendlistInsert(getId, RFMODULE_CMD_GET_RFCHN);
 }
 
 void RFModuleSendData(uint8_t *data, uint16_t len)
@@ -298,42 +319,11 @@ bool RFModuleDetected(void)
 void RFMoudleSetChannel(uint8_t chn)
 {   
     uint8_t rfchnl = chn - 1;
-    char *chnlist[HAL_RF_CHANNEL_NUM] = {
-                        "ATCM002BC88E10\r",  //430.5
-                        "ATCM002B9E9810\r",  //431.5
-                        "ATCM002B77A210\r",  //432.5
-                        "ATCM002B50AC10\r",  //433.5
-                        "ATCM002B29B610\r",  //434.5
-                        "ATCM002B00C010\r",  //435.5
-                        "ATCM002BD9C910\r",  //436.5
-                        "ATCM002BB2D310\r",  //437.5
-                        "ATCM002B8BDD10\r",  //438.5
-                        "ATCM002B64E710\r",  //439.5
-                        "ATCM002B3DF110\r",  //440.5
-                        "ATCM002B16FB10\r",  //441.5
-                        "ATCM002BEF0411\r",  //442.5
-                        "ATCM002BC80E11\r",  //443.5
-                        "ATCM002BA11811\r",  //444.5
-                        "ATCM002B762211\r",  //445.5
-                        "ATCM002BB35311\r",  //450.5
-                        "ATCM002B8C5D11\r",  //451.5
-                        "ATCM002B656711\r",  //452.5
-                        "ATCM002B3E7111\r",  //453.5
-                        "ATCM002B177B11\r",  //454.5
-                        "ATCM002BF08411\r",  //455.5
-                        "ATCM002B2BB611\r",  //460.5
-                        "ATCM002B66E711\r",  //465.5
-                        "ATCM002BA11812\r",  //470.5
-                        "ATCM002BDCC90F\r",  //410.5
-                        "ATCM002B17FB0F\r",  //415.5
-                        "ATCM002B522C10\r",  //420.5
-                        "ATCM002B8D5D10\r",  //425.5
-                        };
 
     Syslog("%d", chn);
     if(rfchnl < HAL_RF_CHANNEL_NUM)
     {
-        sendlistInsert(chnlist[rfchnl], RFMODULE_CMD_RFCHN);
+        sendlistInsert((char *)g_chnlist[rfchnl], RFMODULE_CMD_SET_RFCHN);
     }
 }
 
@@ -364,12 +354,13 @@ static void rfModulePowerInit(void)
     PMRegist(&pm, PM_DEVICE_ID_RFMODULE);
 }
 
-void RFModuleInit(void)
+void RFModuleInit(RFModuleEvent_cb eventcb)
 {   
     uartInit();
     HalExtiWakeupSet(true);
     rfModulePowerInit();
-    rfModuleDetect();
+    //rfModuleDetect();
+    g_rfModuleEventHandle = eventcb;
 }
 
 void RFModulePoll(void)

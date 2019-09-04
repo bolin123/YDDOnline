@@ -150,7 +150,7 @@ static void startupInit(void)
         g_sysConfig.threshold = 50;
         HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
     }
-    
+    SysSignalThresholdSet(g_sysConfig.threshold);
     //log
     printf("\r\n-----------------------------------------------------------\r\n");
     printf("--Firmware version:%s\r\n", SYS_FIRMWARE_VERSION);

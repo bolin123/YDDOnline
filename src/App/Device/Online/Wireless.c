@@ -58,10 +58,25 @@ void WirelessSetChannel(uint8_t chn)
     RFMoudleSetChannel(chn);
 }
 
+static void rfEventHandle(RFModuleEvent_t event, void *arg)
+{
+    uint8_t chnl;
+    if(event == RFMODULE_EVENT_GET_RFCHNL)
+    {
+        chnl = (uint8_t)(uint32_t)arg;
+        Syslog("got chnl = %d", chnl);
+        if(chnl != SysRfChannelGet())
+        {
+            RFMoudleSetChannel(SysRfChannelGet());
+        }
+    }
+}
+
 void WirelessInit(WirelessDataEvent_cb eventHandle)
 {
     g_eventHandle = eventHandle;
-    RFModuleInit();
+    RFModuleInit(rfEventHandle);
+    RFModuleGetChannel();
 }
 
 void WirelessPoll(void)
