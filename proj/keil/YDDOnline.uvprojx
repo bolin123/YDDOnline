@@ -521,6 +521,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\src\App\Device\Online\Menu.c</FilePath>
             </File>
+            <File>
+              <FileName>WiredProto.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\WiredProto.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -530,6 +535,11 @@
               <FileName>Sys.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\src\Sys\Sys.c</FilePath>
+            </File>
+            <File>
+              <FileName>SysTimer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\Sys\SysTimer.c</FilePath>
             </File>
           </Files>
         </Group>
