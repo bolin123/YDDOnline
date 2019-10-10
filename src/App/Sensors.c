@@ -141,6 +141,7 @@ static void sensorsSleep(PM_t *pm)
 {
     if(pm)
     {
+        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_DISABLE_LEVEL);
         HalADCStop();
         HalDACEnable(false);
         pm->status = PM_STATUS_SLEEP;
@@ -150,10 +151,12 @@ static void sensorsSleep(PM_t *pm)
 static void sensorsWakeup(PM_t *pm, PMWakeupType_t type)
 {
     
-    if(pm)
+    if(pm && pm->status == PM_STATUS_SLEEP)
     {
+        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_ENABLE_LEVEL);
         HalADCStart();
         HalDACEnable(true);
+        SysSignalThresholdUpdate();
         pm->status = PM_STATUS_WAKEUP;
     }
 }
@@ -170,6 +173,9 @@ static void sensorsPowerInit(void)
 #endif
 void SensorsInitialize(SensorsEvent_cb eventCb)
 {   
+    HalGPIOConfig(HAL_SENSORS_POWER_PIN, HAL_IO_OUTPUT);//PC13
+    HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_ENABLE_LEVEL);
+    
     sensorsPowerInit();
     g_seventCb = eventCb;
 }

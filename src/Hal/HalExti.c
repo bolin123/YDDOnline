@@ -2,13 +2,13 @@
 #include "PowerManager.h"
 
 extern void YDDOnlineSensorFreqTrigger(uint8_t ch);
-//extern void YDDOnlineWakeup(void);
+extern void YDDOnlineLightActive(void);
 
 void EXTI9_5_IRQHandler(void)
 {
     if(EXTI_GetITStatus(EXTI_Line5) != RESET)
     {
-        YDDOnlineSensorFreqTrigger(HAL_SENSOR_ID_GEOMAGNETISM);
+        YDDOnlineSensorFreqTrigger(HAL_SENSOR_ID_NOISE);
         EXTI_ClearITPendingBit(EXTI_Line5);
     }
 
@@ -20,7 +20,8 @@ void EXTI9_5_IRQHandler(void)
 
     if(EXTI_GetITStatus(EXTI_Line6) != RESET)
     {
-        PMWakeup(PM_WAKEUP_TYPE_LIGHT);
+        //PMWakeup(PM_WAKEUP_TYPE_LIGHT);
+        YDDOnlineLightActive();
         EXTI_ClearITPendingBit(EXTI_Line6);
     }
 }
@@ -29,7 +30,7 @@ void EXTI2_IRQHandler(void)
 {
 	if(EXTI_GetITStatus(EXTI_Line2) != RESET)
 	{
-        YDDOnlineSensorFreqTrigger(HAL_SENSOR_ID_NOISE);
+        YDDOnlineSensorFreqTrigger(HAL_SENSOR_ID_GEOMAGNETISM);
         EXTI_ClearITPendingBit(EXTI_Line2);
     }
 }

@@ -10,7 +10,7 @@ static uint8_t g_segCode[] = {
 static uint8_t g_segPin[] = {0x33, 0x16, 0x2c, 0x31, 0x32, 0x34, 0x2b, 0x30};
 static uint8_t g_digPin[DIGITAL_LED_ID_COUNT] = {0x40, 0x19, 0x18, 0x17};
 static uint8_t g_charValue[DIGITAL_LED_ID_COUNT];
-//static bool g_ledOn = false;
+static bool g_ledOn = false;
 
 void DigitalLEDScan(void)
 {
@@ -48,21 +48,28 @@ void DigitalLEDSetChars(DigitalLEDId_t id, uint8_t value, bool point)
 
 void DigitalLEDOn(void)
 {
-    HalLEDUpdateTimerEnable(true);
+    if(!g_ledOn)
+    {
+        HalLEDUpdateTimerEnable(true);
+        g_ledOn = true;
+    }
 }
 
 void DigitalLEDOff(void)
 {
     uint8_t i;
-    //g_ledOn = false;
-    HalLEDUpdateTimerEnable(false);
-    for(i = 0; i < sizeof(g_digPin); i++)
+    if(g_ledOn)
     {
-        HalGPIOSetLevel(g_digPin[i], 0);
-    }
-    for(i = 0; i < sizeof(g_segPin); i++)
-    {
-        HalGPIOSetLevel(g_segPin[i], 0);
+        HalLEDUpdateTimerEnable(false);
+        for(i = 0; i < sizeof(g_digPin); i++)
+        {
+            HalGPIOSetLevel(g_digPin[i], 0);
+        }
+        for(i = 0; i < sizeof(g_segPin); i++)
+        {
+            HalGPIOSetLevel(g_segPin[i], 0);
+        }
+        g_ledOn = false;
     }
 }
 
@@ -71,16 +78,16 @@ static void ledPMSleep(PM_t *pm)
     if(pm)
     {
         DigitalLEDOff();
-        HalGPIOSetLevel(HAL_IR_POWER_PIN, 1); //power off
+        HalGPIOSetLevel(HAL_IR_POWER_PIN, HAL_IR_POWER_DISABLE_LEVEL); //power off
         pm->status = PM_STATUS_SLEEP;
     }
 }
 
 static void ledPMWakeup(PM_t *pm, PMWakeupType_t type)
 {
-    if(pm && type == PM_WAKEUP_TYPE_LIGHT) //光照才打开遥控和数码管电源
+    if(pm && pm->status == PM_STATUS_SLEEP && type == PM_WAKEUP_TYPE_LIGHT) //光照才打开遥控和数码管电源
     {
-        HalGPIOSetLevel(HAL_IR_POWER_PIN, 0); //power on
+        HalGPIOSetLevel(HAL_IR_POWER_PIN, HAL_IR_POWER_ENABLE_LEVEL); //power on
         DigitalLEDOn();
         pm->status = PM_STATUS_WAKEUP;
     }
@@ -103,7 +110,7 @@ void DigitalLEDInit(void)
 
     uint8_t i;
     HalGPIOConfig(HAL_IR_POWER_PIN, HAL_IO_OUTPUT);//PC13
-    HalGPIOSetLevel(HAL_IR_POWER_PIN, 0);//enable
+    HalGPIOSetLevel(HAL_IR_POWER_PIN, HAL_IR_POWER_ENABLE_LEVEL);//enable
 
     for(i = 0; i < sizeof(g_digPin); i++)
     {
@@ -116,6 +123,6 @@ void DigitalLEDInit(void)
         HalGPIOConfig(g_segPin[i], HAL_IO_OUTPUT);
         HalGPIOSetLevel(g_segPin[i], 0);
     }
-		ledPMRegist();
+    ledPMRegist();
 }
 

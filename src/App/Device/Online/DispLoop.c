@@ -27,9 +27,12 @@ void DispLoopStop(void)
 
 void DispLoopStart(uint8_t loop)
 {
-    g_loopStart = true;
-    g_loopCount = loop;
-    g_curLoopID = DISPLOOP_ID_ADDR;
+    if(!g_loopStart)
+    {
+        g_loopStart = true;
+        g_loopCount = loop;
+        g_curLoopID = DISPLOOP_ID_ADDR;
+    }
 }
 
 static void disploopHandle(void)

@@ -17,16 +17,21 @@ void PMWakeup(PMWakeupType_t type)
     int i;
 
     g_startSleep = false;
-    g_wakeupType |= type;
-    g_sleepTime = SysTime();
-    
-    for(i = PM_DEVICE_ID_COUNT; i > 0; i--)
+
+    if(!PMIsTypeWakeup(type))
     {
-        if(g_pm[i - 1].enable)
+        g_wakeupType |= type;
+        g_sleepTime = SysTime();
+        
+        for(i = PM_DEVICE_ID_COUNT; i > 0; i--)
         {
-            g_pm[i - 1].wakeup(&g_pm[i - 1], type);
+            if(g_pm[i - 1].enable)
+            {
+                g_pm[i - 1].wakeup(&g_pm[i - 1], type);
+            }
         }
     }
+    
 #endif
 }
 
@@ -35,7 +40,6 @@ void PMStartSleep(uint32_t after)
 #if 1
     Syslog("after %dms", after);
     g_startSleep = true;
-    g_wakeupType = PM_WAKEUP_TYPE_NONE;
     if((SysTime() + after) > g_sleepTime)
     {
         g_sleepTime = SysTime() + after;
@@ -74,34 +78,32 @@ static void lowSleep(PM_t *pm)
 {
     if(pm)
     {
-        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 0);
-        HalGPIOSetLevel(HAL_485_POWER_PIN,     1);
-        pm->status = PM_STATUS_SLEEP;
+        //HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_DISABLE_LEVEL);
+        //HalGPIOSetLevel(HAL_485_POWER_PIN,     1);
+        g_wakeupType = PM_WAKEUP_TYPE_NONE;
+        pm->status = PM_STATUS_SLEEP;        
         HalCommonFallasleep();
     }
 }
 
 static void powerup(PM_t *pm, PMWakeupType_t type)
 {
-    if(pm)
+    if(pm && pm->status == PM_STATUS_SLEEP)
     {
         HalCommonWakeup();
-        HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 1);
-        HalGPIOSetLevel(HAL_485_POWER_PIN,     0);
+        //HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_ENABLE_LEVEL);
+        //HalGPIOSetLevel(HAL_485_POWER_PIN,     0);
  
         pm->status = PM_STATUS_WAKEUP;
     }
 }
-
+/*
 static void powerPinInit(void)
 {
-    HalGPIOConfig(HAL_485_POWER_PIN, HAL_IO_OUTPUT);//pa12
-    HalGPIOSetLevel(HAL_485_POWER_PIN, 1);
-
     HalGPIOConfig(HAL_SENSORS_POWER_PIN, HAL_IO_OUTPUT);//PC13
-    HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, 1);
+    HalGPIOSetLevel(HAL_SENSORS_POWER_PIN, HAL_SENSORS_POWER_ENABLE_LEVEL);
 }
-
+*/
 void PMInit(void)
 {
     PM_t pm;
@@ -110,7 +112,7 @@ void PMInit(void)
     pm.wakeup = powerup;
     PMRegist(&pm, PM_DEVICE_ID_HAL);
 
-    powerPinInit();
+    //powerPinInit();
 }
 
 void PMPoll(void)

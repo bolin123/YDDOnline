@@ -192,7 +192,7 @@ static void irPMSleep(struct PM_st *pm)
 
 static void irPMWakeup(struct PM_st *pm, PMWakeupType_t type)
 {
-    if(pm && PM_WAKEUP_TYPE_LIGHT == type)
+    if(pm && pm->status == PM_STATUS_SLEEP && PM_WAKEUP_TYPE_LIGHT == type)
     {
         HalExtiIRRecvEnable(true);
         HalIRRecvTimerEnable(true);

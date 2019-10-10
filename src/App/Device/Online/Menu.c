@@ -2,9 +2,12 @@
 #include "Sys.h"
 #include "DigitalLED.h"
 
+#define MENU_TIMEOUT_COUNT 30000
+
 typedef struct
 {
-    bool light;
+    bool enable;
+    uint8_t lightLevel;
     uint8_t pos;
     uint8_t value[DIGITAL_LED_ID_COUNT];
     uint16_t realValue;
@@ -15,26 +18,25 @@ typedef struct
 static MenuItem_t g_menuItems[MENU_ID_COUNT];
 static MenuFlashData_t g_flashData;
 static bool g_menuActived = false;
+static uint32_t g_activeTime;
+static MenuEventHandle_cb g_eventHandle;
 
 static void menuShowPoll(void)
 {
     MenuFlashData_t *flash = &g_flashData;
     
-    if(g_menuActived)
+    if(flash->enable && SysTimeHasPast(flash->lastTime, 500))
     {
-        if(SysTimeHasPast(flash->lastTime, 500))
+        flash->lightLevel = !flash->lightLevel;
+        if(flash->lightLevel)
         {
-            flash->light = !flash->light;
-            if(flash->light)
-            {
-                DigitalLEDSetChars((DigitalLEDId_t)flash->pos, flash->value[flash->pos], (flash->value[flash->pos] & 0x80) != 0);
-            }
-            else
-            {
-                DigitalLEDSetChars((DigitalLEDId_t)flash->pos, DIGITAL_FLAG_NONE, false);
-            }
-            flash->lastTime = SysTime();
+            DigitalLEDSetChars((DigitalLEDId_t)flash->pos, flash->value[flash->pos], (flash->value[flash->pos] & 0x80) != 0);
         }
+        else
+        {
+            DigitalLEDSetChars((DigitalLEDId_t)flash->pos, DIGITAL_FLAG_NONE, false);
+        }
+        flash->lastTime = SysTime();
     }
 }
 
@@ -48,39 +50,21 @@ static void menuNext(void)
     
     if(g_menuActived)
     {
-        flash->curMenuID++;
-        if(flash->curMenuID >= MENU_ID_COUNT)
+        do
         {
-            flash->curMenuID = MENU_ID_ADDR;
+            flash->curMenuID++;
+            if(flash->curMenuID >= MENU_ID_COUNT)
+            {
+                flash->curMenuID = MENU_ID_ADDR;
+            }
         }
-        
-        /*
-        switch (flash->curMenuID)
-        {
-        case MENU_ID_ADDR:
-            value = SysRfAddressGet();
-            flag = DIGITAL_FLAG_A;
-        break;
-        case MENU_ID_RFCHN:
-            value = SysRfChannelGet();
-            flag = DIGITAL_FLAG_C;
-        break;
-        case MENU_ID_DEVTYPE:
-            value = (uint16_t)SysDeviceTypeGet();
-            flag = DIGITAL_FLAG_D;
-        break;
-        default:
-            break;
-        }
-        */
+        while (!g_menuItems[flash->curMenuID].enable);
     }
     else
     {
         flash->curMenuID = MENU_ID_ADDR;
-        //value = SysRfAddressGet();
-        //flag = DIGITAL_FLAG_A;
-
         g_menuActived = true;
+        g_eventHandle(MENU_EVENT_ACTIVE);
     }
     item = &g_menuItems[flash->curMenuID];
     value = item->getValue(flash->curMenuID);
@@ -97,8 +81,8 @@ static void menuNext(void)
     }
     flash->realValue = value;
     flash->lastTime = SysTime();
-    flash->light = true;
-
+    flash->lightLevel = 1;
+    flash->enable = true;
 }
 
 static void menuValueSet(bool add)
@@ -223,16 +207,19 @@ void MenuKeyHandle(IRKey_t key)
         item = &g_menuItems[flash->curMenuID];
         item->setValue(flash->curMenuID, flash->realValue);
         DigitalLEDSetChars((DigitalLEDId_t)flash->pos, flash->value[flash->pos], (flash->value[flash->pos] & 0x80) != 0);
-        g_menuActived = false;
+        flash->enable = false;
         break;
     case IR_KEY_CANCEL:
         flash = &g_flashData;
         DigitalLEDSetChars((DigitalLEDId_t)flash->pos, flash->value[flash->pos], (flash->value[flash->pos] & 0x80) != 0);
-        g_menuActived = false;
+        //g_menuActived = false;
+        flash->enable = false;
+        g_eventHandle(MENU_EVENT_DEACTIVE);
         break;
     default:
         break;
     }
+    g_activeTime = SysTime();
 }
 
 void MenuRegister(MenuID_t id, MenuItem_t *item)
@@ -244,12 +231,24 @@ void MenuRegister(MenuID_t id, MenuItem_t *item)
     }
 }
 
-void MenuInit(void)
+static void menuActiveTimePoll(void)
 {
+    if(g_menuActived && SysTimeHasPast(g_activeTime, MENU_TIMEOUT_COUNT))
+    {
+        g_eventHandle(MENU_EVENT_TIMEOUT);
+        //g_menuActived = false;
+    }
+}
+
+void MenuInit(MenuEventHandle_cb eventHandle)
+{
+    memset(g_menuItems, 0, sizeof(MenuItem_t) * MENU_ID_COUNT);
+    g_eventHandle = eventHandle;
 }
 
 void MenuPoll(void)
 {
     menuShowPoll();
+    menuActiveTimePoll();
 }
 

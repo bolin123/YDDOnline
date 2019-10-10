@@ -3,6 +3,7 @@
 #include "W25Q64.h"
 #include "YDDOnline.h"
 #include "PowerManager.h"
+#include "SysTimer.h"
 
 #define SYS_FIRMWARE_VERSION "1.0.0.1"
 #define SYS_POWER_ADC_NUM 10
@@ -13,6 +14,7 @@ typedef struct
     uint8_t rfChnl;
     uint8_t devType;
     uint16_t threshold;
+    SysCommunicateType_t commType; //通信方式 1=无线，2=有线
 }SysConfig_t;
 
 static uint16_t g_power[SYS_POWER_ADC_NUM];
@@ -75,6 +77,17 @@ int SysDateTimeSet(SysDateTime_t *dateTime)
     return HalRTCSetTime((HalRTCTime_t *)dateTime);
 }
 
+SysCommunicateType_t SysCommunicateTypeGet(void)
+{
+    return g_sysConfig.commType;
+}
+
+void SysCommunicateTypeSet(SysCommunicateType_t type)
+{
+    g_sysConfig.commType = type;
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+}
+
 uint16_t SysSignalThresholdGet(void)
 {
     return g_sysConfig.threshold;
@@ -88,6 +101,12 @@ void SysSignalThresholdSet(uint16_t value)
 
     g_sysConfig.threshold = value;
     HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+}
+
+void SysSignalThresholdUpdate(void)
+{
+    uint16_t daValue = (g_sysConfig.threshold / 50) * HAL_DAC_STEP_VALUE + HAL_DAC_BASE_VALUE;
+    HalDACSetValue(daValue);
 }
 
 void SysRfAddressSet(uint8_t addr)
@@ -148,6 +167,7 @@ static void startupInit(void)
         g_sysConfig.rfChnl = 0x01;
         g_sysConfig.devType = HAL_DEVICE_TYPE_PRESS;
         g_sysConfig.threshold = 50;
+        g_sysConfig.commType = SYS_COMMUNICATE_TYPE_WIRELESS; //默认为无线通信
         HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
     }
     SysSignalThresholdSet(g_sysConfig.threshold);
@@ -155,7 +175,8 @@ static void startupInit(void)
     printf("\r\n-----------------------------------------------------------\r\n");
     printf("--Firmware version:%s\r\n", SYS_FIRMWARE_VERSION);
     printf("--Device type:%d, threshold = %d\r\n", g_sysConfig.devType, g_sysConfig.threshold);
-    printf("--Rf address:%d, channel:%d\r\n", g_sysConfig.rfAddr, g_sysConfig.rfChnl);
+    printf("--Device address:%d, rf channel:%d\r\n", g_sysConfig.rfAddr, g_sysConfig.rfChnl);
+    printf("--Communication type: %s,%d\r\n", g_sysConfig.commType == SYS_COMMUNICATE_TYPE_WIRELESS ? "WIRELESS":"WIRED", g_sysConfig.commType);
     SysDateTime_t *time = SysDateTime();
     printf("--Now: %d-%02d-%02d %02d:%02d:%02d\r\n", time->year, time->month, time->day, 
                                           time->hour, time->minute, time->second);
@@ -185,8 +206,8 @@ extern void TestCollectPoll(void);
 void SysPoll(void)
 {
     HalCommonPoll();
-    W25Q64Poll();
     PMPoll();
+    SysTimerPoll();
     YDDOnlinePoll();
     powerValueUpdate();
 }

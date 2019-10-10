@@ -8,7 +8,7 @@
 #define ADC1_DR_ADDRESS ((uint32_t)0x4001244C)
 
 //static uint16_t g_adcValue[HAL_ADC_CH_BUFF_LEN][HAL_ADC_CHANNEL_COUNT];
-static uint16_t g_adcValue[HAL_ADC_CHANNEL_COUNT];
+static volatile uint16_t g_adcValue[HAL_ADC_CHANNEL_COUNT];
 static volatile uint16_t g_maxValue[2];
 #if 0
 
@@ -122,8 +122,8 @@ void HalADCInitialize(void)
     ADC_InitTypeDef ADC_InitStructure;
     DMA_InitTypeDef DMA_InitStructure;
 
-    //memset((void *)g_maxValue, 0, sizeof(g_maxValue));
-    RCC_ADCCLKConfig(RCC_PCLK2_Div6);
+    memset((void *)g_maxValue, 0, sizeof(g_maxValue));
+    RCC_ADCCLKConfig(RCC_PCLK2_Div2);
 
     NVIC_InitTypeDef NVIC_InitStructure;
     
@@ -212,22 +212,22 @@ void HalADCInitialize(void)
 
 void DMA1_Channel1_IRQHandler(void)
 {
-//    uint8_t i;
+    uint8_t i;
     //static uint16_t max = 0;
     if(DMA_GetFlagStatus(DMA1_FLAG_TC1))
     {
         DMA_ClearITPendingBit(DMA1_FLAG_TC1);
-        /*
-        for(i = 0; i < HAL_SENSOR_ID_COUNT - 1; i++)
+        
+        for(i = 0; i < 2; i++)
         {
             if(g_maxValue[i] < g_adcValue[i]) //取最大值
             {
                 g_maxValue[i] = g_adcValue[i];
             }
         }
-        */
-        g_maxValue[0] = (g_maxValue[0] > g_adcValue[0]) ? g_maxValue[0] : g_adcValue[0];
-        g_maxValue[1] = (g_maxValue[1] > g_adcValue[1]) ? g_maxValue[1] : g_adcValue[1];
+        
+        //g_maxValue[0] = (g_maxValue[0] > g_adcValue[0]) ? g_maxValue[0] : g_adcValue[0];
+        //g_maxValue[1] = (g_maxValue[1] > g_adcValue[1]) ? g_maxValue[1] : g_adcValue[1];
     }
 }
 

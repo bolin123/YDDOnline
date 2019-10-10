@@ -11,7 +11,8 @@ typedef enum
     DISPLOOP_ID_ERRCODE,  //异常代码
     DISPLOOP_ID_POWER,    //电量
 //    DISPLOOP_ID_TEMP,     //温度
-    DISPLOOP_ID_PRESS,    //应力
+    DISPLOOP_ID_PRESS1,    //应力1
+    DISPLOOP_ID_PRESS2,    //应力2
     DISPLOOP_ID_THRESHOLD,//阈值
     DISPLOOP_ID_COUNT,
 }DispLoopID_t;

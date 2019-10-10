@@ -1,6 +1,8 @@
 #include "Wireless.h"
 #include "RFModule.h"
 
+#define WIRELESS_WAIT_TIMES 0xE803D007 //设置外设开机时间1000ms+响应超时2000ms
+
 typedef struct
 {
     char preamble;
@@ -61,6 +63,7 @@ void WirelessSetChannel(uint8_t chn)
 static void rfEventHandle(RFModuleEvent_t event, void *arg)
 {
     uint8_t chnl;
+    uint32_t times;
     if(event == RFMODULE_EVENT_GET_RFCHNL)
     {
         chnl = (uint8_t)(uint32_t)arg;
@@ -70,6 +73,15 @@ static void rfEventHandle(RFModuleEvent_t event, void *arg)
             RFMoudleSetChannel(SysRfChannelGet());
         }
     }
+    else //RFMODULE_EVENT_GET_WAITTIME
+    {
+        times = (uint32_t)arg;
+        Syslog("got wait times = %04x, %04x", times, (uint32_t)arg);
+        if(times != WIRELESS_WAIT_TIMES)
+        {
+            RFModuleSetWaitTimes(WIRELESS_WAIT_TIMES);
+        }
+    }
 }
 
 void WirelessInit(WirelessDataEvent_cb eventHandle)
@@ -77,6 +89,7 @@ void WirelessInit(WirelessDataEvent_cb eventHandle)
     g_eventHandle = eventHandle;
     RFModuleInit(rfEventHandle);
     RFModuleGetChannel();
+    RFModuleGetWaitTimes();
 }
 
 void WirelessPoll(void)

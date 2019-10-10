@@ -26,11 +26,22 @@ typedef enum
 }HalDeviceType_t;
 
 #define HAL_IO_UART_PIN  0x3c  //Ä£Äâ´®¿ÚIO PD12
-#define HAL_LED1_PIN     0x41  //PE1
+#define HAL_STATUS_LED_PIN     0x41  //PE1
+#define HAL_STATUS_LED_ENABLE_LEVEL  0
+#define HAL_STATUS_LED_DISABLE_LEVEL 1
 
 #define HAL_SENSORS_POWER_PIN 0x2d //PC13
+#define HAL_SENSORS_POWER_ENABLE_LEVEL  1
+#define HAL_SENSORS_POWER_DISABLE_LEVEL 0
+
 #define HAL_485_POWER_PIN     0x0c //PA12
+#define HAL_485_POWER_ENABLE_LEVEL  0
+#define HAL_485_POWER_DISABLE_LEVEL 1
+
 #define HAL_IR_POWER_PIN      0x42
+#define HAL_IR_POWER_ENABLE_LEVEL  0
+#define HAL_IR_POWER_DISABLE_LEVEL 1
+
 #define HAL_IR_INPUT_PIN      0x43  //pe3
 
 

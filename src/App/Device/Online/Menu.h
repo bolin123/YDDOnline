@@ -5,15 +5,24 @@
 
 typedef enum
 {
-    MENU_ID_ADDR = 0,
-    MENU_ID_RFCHN,
-    MENU_ID_DEVTYPE,
+    MENU_ID_ADDR = 0, //通信地址
+    MENU_ID_RFCHN,    //无线通道
+    MENU_ID_DEVTYPE,  //设备类型
+    MENU_ID_COMMTYPE, //通信方式
     //MENU_ID_THRESHOLD,
     MENU_ID_COUNT,
 }MenuID_t;
 
+typedef enum
+{
+    MENU_EVENT_ACTIVE,
+    MENU_EVENT_DEACTIVE,
+    MENU_EVENT_TIMEOUT,
+}MenuEvent_t;
+
 typedef unsigned short (*MenuGetValue_cb)(MenuID_t id);
 typedef void (*MenuSetValue_cb)(MenuID_t id, unsigned short value);
+typedef void (*MenuEventHandle_cb)(MenuEvent_t event);
 
 typedef struct
 {
@@ -30,6 +39,6 @@ typedef struct
 void MenuDeactive(void);
 void MenuKeyHandle(IRKey_t key);
 void MenuRegister(MenuID_t id, MenuItem_t *item);
-void MenuInit(void);
+void MenuInit(MenuEventHandle_cb eventHandle);
 void MenuPoll(void);
 #endif

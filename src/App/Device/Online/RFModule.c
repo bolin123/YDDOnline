@@ -12,6 +12,8 @@ typedef enum
 {
     RFMODULE_CMD_GET_RFCHN = 0,
     RFMODULE_CMD_SET_RFCHN,
+    RFMODULE_CMD_GET_WAITTIME,
+    RFMODULE_CMD_SET_WAITTIME,
 }RFModuleCmd_t;
 
 typedef struct RFSendList_st
@@ -151,6 +153,7 @@ static void rfSendlistHandle(void)
 static void atcmdParse(char *atcmd)
 {
     RFModuleSendList_t *rfsend;
+    char *value = &atcmd[4];
     Syslog("%s", atcmd);
     
     g_rfModuleDetected = true;
@@ -158,24 +161,33 @@ static void atcmdParse(char *atcmd)
     if(strstr(atcmd, "ATCb"))
     {
         rfsend = VTListFirst(&g_rfmoduleList);
-        if(rfsend && rfsend->cmd == RFMODULE_CMD_GET_RFCHN)
+        if(rfsend)
         {
-            char *chnl = &atcmd[4];
-            for(uint32_t i = 0; i < HAL_RF_CHANNEL_NUM; i++)
+            if(rfsend->cmd == RFMODULE_CMD_GET_RFCHN)
             {
-                if(strstr(g_chnlist[i], chnl))
+                for(uint32_t i = 0; i < HAL_RF_CHANNEL_NUM; i++)
                 {
-                    g_rfModuleEventHandle(RFMODULE_EVENT_GET_RFCHNL, (void *)(i + 1));
-                    break;
+                    if(strstr(g_chnlist[i], value))
+                    {
+                        g_rfModuleEventHandle(RFMODULE_EVENT_GET_RFCHNL, (void *)(i + 1));
+                        break;
+                    }
                 }
             }
+            else //RFMODULE_CMD_GET_WAITTIME
+            {
+                //ATCbD007B80B
+                uint32_t time = (uint32_t)strtoul(value, NULL, 16);
+                g_rfModuleEventHandle(RFMODULE_EVENT_GET_WAITTIME, (void *)time);
+            }
+            
             sendlistDel(rfsend);
         }
     }
     else if(strstr(atcmd, "ATOK"))
     {
         rfsend = VTListFirst(&g_rfmoduleList);
-        if(rfsend && rfsend->cmd == RFMODULE_CMD_SET_RFCHN)
+        if(rfsend)
         {
             sendlistDel(rfsend);
         }
@@ -302,6 +314,21 @@ void RFModuleGetChannel(void)
     sendlistInsert(getId, RFMODULE_CMD_GET_RFCHN);
 }
 
+void RFModuleGetWaitTimes(void)
+{
+    char *cmd = "ATCb003C04\r"; //读取开机和响应超时时间
+    sendlistInsert(cmd, RFMODULE_CMD_GET_WAITTIME);    
+}
+
+void RFModuleSetWaitTimes(uint32_t time)
+{
+    char cmd[20] = "";
+    
+    Syslog("%04x", time);
+    sprintf(cmd, "ATCM003C%04x\r", time);
+    sendlistInsert(cmd, RFMODULE_CMD_SET_WAITTIME);
+}
+
 void RFModuleSendData(uint8_t *data, uint16_t len)
 {
     if(g_rfModuleDetected)
@@ -338,7 +365,7 @@ static void rfModuleSleep(PM_t *pm)
 
 static void rfModuleWakeup(PM_t *pm, PMWakeupType_t type)
 {
-    if(pm)
+    if(pm && pm->status == PM_STATUS_SLEEP)
     {
         uartInit();
         pm->status = PM_STATUS_WAKEUP;
