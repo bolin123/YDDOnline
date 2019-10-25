@@ -13,7 +13,7 @@ typedef struct
 }IrRxData_t;
 #pragma pack()
 
-#define IR_TX_EN_PIN 0x45  //pe5
+#define IR_TX_EN_PIN 0x27  //pc7
 #define IR_TX_EN_ENABLE_LEVEL 
 
 static volatile uint32_t g_irTimerCount = 0;

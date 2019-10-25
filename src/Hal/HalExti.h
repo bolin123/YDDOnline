@@ -4,6 +4,7 @@
 #include "HalCtype.h"
 
 void HalExtiIRRecvEnable(bool enable);
+void HalExtiLightEnable(bool enable);
 void HalExtiWakeupSet(bool enable);
 void HalExtiFreqStart(void);
 void HalExtiFreqStop(void);

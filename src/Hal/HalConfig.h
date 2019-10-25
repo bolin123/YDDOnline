@@ -25,24 +25,24 @@ typedef enum
     HAL_DEVICE_TYPE_GEO,        //地音地磁
 }HalDeviceType_t;
 
-#define HAL_IO_UART_PIN  0x3c  //模拟串口IO PD12
+#define HAL_IO_UART_PIN  0x21  //模拟串口IO Pc1
 #define HAL_STATUS_LED_PIN     0x41  //PE1
 #define HAL_STATUS_LED_ENABLE_LEVEL  0
 #define HAL_STATUS_LED_DISABLE_LEVEL 1
 
-#define HAL_SENSORS_POWER_PIN 0x2d //PC13
+#define HAL_SENSORS_POWER_PIN 0x02 //PA2
 #define HAL_SENSORS_POWER_ENABLE_LEVEL  1
 #define HAL_SENSORS_POWER_DISABLE_LEVEL 0
 
-#define HAL_485_POWER_PIN     0x0c //PA12
+#define HAL_485_POWER_PIN     0x3f //Pd15
 #define HAL_485_POWER_ENABLE_LEVEL  0
 #define HAL_485_POWER_DISABLE_LEVEL 1
 
-#define HAL_IR_POWER_PIN      0x42
+#define HAL_IR_POWER_PIN      0x0c //pa12
 #define HAL_IR_POWER_ENABLE_LEVEL  0
 #define HAL_IR_POWER_DISABLE_LEVEL 1
 
-#define HAL_IR_INPUT_PIN      0x43  //pe3
+#define HAL_IR_INPUT_PIN      0x30  //pd0
 
 
 //#define HAL_ADC_CH_NUM 4

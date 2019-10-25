@@ -23,20 +23,23 @@ static bool g_queryRecved = false;
 
 static void yddWakeup(PM_t *pm, PMWakeupType_t type)
 {
-    Syslog("type = %d", type);
+    //Syslog("type = %d", type);
     if(pm)
     {
         if(pm->status != PM_STATUS_WAKEUP)
         {
             HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_ENABLE_LEVEL);
             TemperaturePowerOn();
-            PMStartSleep(2000);
         }
         
         if(type == PM_WAKEUP_TYPE_LIGHT)
         {
             DispLoopStart(2);
             SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+        }
+        else
+        {
+            PMStartSleep(2000);
         }
         pm->status = PM_STATUS_WAKEUP;
     }
@@ -132,6 +135,7 @@ static void wirelessEventHandle(WirelessEvent_t event, void *args)
     if(event == WIRELESS_EVENT_QUERY)
     {
         g_queryRecved = true;
+        Syslog("sensor sampling...");
         SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
         PMStartSleep(2000);
     }
@@ -291,6 +295,7 @@ void YDDOnlineLightActive(void)
 {
     if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
     {
+        HalExtiLightEnable(false);
         PMWakeup(PM_WAKEUP_TYPE_LIGHT);
     }
     else

@@ -1,7 +1,7 @@
 #include "Temperature.h"
 #include "Sys.h"
 
-#define TEMP_18B20_DQ_PIN 0x3b //pd11
+#define TEMP_18B20_DQ_PIN 0x03 //pa3
 #define TEMP_18B20_DQ_INPUT() HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_INPUT)
 #define TEMP_18B20_DQ_OUTPUT() HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT)
 #define TEMP_18B20_DQ_SET_LEVEL(x) HalGPIOSetLevel(TEMP_18B20_DQ_PIN, x)

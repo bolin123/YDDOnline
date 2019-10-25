@@ -110,12 +110,21 @@ void HalADCStart(void)
 void HalADCInitialize(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
-    
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_7; //pa5 battery voltage
+
+    /*
+    BAT_DET, PA1 --- ADC123_IN1
+    OUT1,    PA6 --- ADC12_IN6
+    OUT2,    PA7 --- ADC12_IN7
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_6 | GPIO_Pin_7; 
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
-    
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_4 | GPIO_Pin_5;
+
+    /*
+    OUT3, PC4 --- ADC12_IN14
+    OUT4, PC5 --- ADC12_IN15
+    */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
     GPIO_Init(GPIOC, &GPIO_InitStructure);
 
@@ -184,11 +193,11 @@ void HalADCInitialize(void)
     ADC_Init(ADC1, &ADC_InitStructure);
 
     //规则模式通道配置
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_1,  1, ADC_SampleTime_1Cycles5);//PA1 
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_7,  2, ADC_SampleTime_1Cycles5);//PA7 
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 3, ADC_SampleTime_71Cycles5);//PC4 
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_15, 4, ADC_SampleTime_71Cycles5);//PC5
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 5, ADC_SampleTime_71Cycles5);//PC0
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_6,  1, ADC_SampleTime_1Cycles5);  //PA6
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_7,  2, ADC_SampleTime_1Cycles5);  //PA7 
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 3, ADC_SampleTime_71Cycles5); //PC4 
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_15, 4, ADC_SampleTime_71Cycles5); //PC5
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_1,  5, ADC_SampleTime_71Cycles5); //PA1 
 
     //使能ADC1的DMA
     ADC_DMACmd(ADC1, ENABLE);

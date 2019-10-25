@@ -22,6 +22,30 @@ typedef struct
 
 static WirelessDataEvent_cb g_eventHandle;
 
+static uint8_t crc8Check(uint8_t *data, uint16_t len)
+{
+    uint8_t i;
+    uint8_t value;
+    
+    value = 0;
+    while(len--)
+    {
+        value ^= *data++;
+        for(i = 0; i < 8; i++)
+        {
+            if(value & 0x01)
+            {
+                value = (value >> 1) ^ 0x8C;
+            }
+            else 
+            {
+                value >>= 1;
+            }
+        }
+    }
+    return value;
+}
+
 void WirelessReportData(uint8_t err, uint8_t power, uint16_t *data, uint16_t dataNum)
 {
     char buff[255] = {0};
@@ -45,7 +69,10 @@ void WirelessReportData(uint8_t err, uint8_t power, uint16_t *data, uint16_t dat
     {
         sprintf(&report->data[i*4], "%04d", data[i]);
     }
-    buff[sizeof(WirelessReport_t) + dataNum * 4] = '\r';
+    uint8_t bufflen = sizeof(WirelessReport_t) + dataNum * 4;
+    uint8_t crc = crc8Check((uint8_t *)buff, bufflen);
+    sprintf(&buff[bufflen], "%02x", crc);
+    buff[bufflen + 2] = '\r';
     RFModuleSendData((uint8_t *)buff, strlen(buff));
 }
 

@@ -111,7 +111,7 @@ void SensorsSamplingStart(Sensors_t *sensors, uint32_t num, uint32_t exflashOffs
     uint8_t i;
     if(sensors && !sensors->start)
     {
-        Syslog("");
+        //Syslog("");
         sensors->start = true;
         sensors->sampleNum = 0;
         sensors->dataNum = 0;

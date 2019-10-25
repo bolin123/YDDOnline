@@ -5,7 +5,7 @@
 #include "PowerManager.h"
 #include "SysTimer.h"
 
-#define SYS_FIRMWARE_VERSION "1.0.0.1"
+#define SYS_FIRMWARE_VERSION "1.0.1.3"
 #define SYS_POWER_ADC_NUM 10
 
 typedef struct

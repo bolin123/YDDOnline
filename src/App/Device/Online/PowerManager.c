@@ -4,7 +4,7 @@
 static PM_t g_pm[PM_DEVICE_ID_COUNT];
 static volatile bool g_startSleep = false;
 static volatile uint8_t g_wakeupType;
-static uint32_t g_sleepTime = 0;
+static volatile uint32_t g_sleepTime = 0;
 
 bool PMIsTypeWakeup(PMWakeupType_t type)
 {
@@ -16,10 +16,9 @@ void PMWakeup(PMWakeupType_t type)
 #if 1
     int i;
 
-    g_startSleep = false;
-
     if(!PMIsTypeWakeup(type))
     {
+        g_startSleep = false;
         g_wakeupType |= type;
         g_sleepTime = SysTime();
         
@@ -38,7 +37,7 @@ void PMWakeup(PMWakeupType_t type)
 void PMStartSleep(uint32_t after)
 {
 #if 1
-    Syslog("after %dms", after);
+    //Syslog("after %dms", after);
     g_startSleep = true;
     if((SysTime() + after) > g_sleepTime)
     {

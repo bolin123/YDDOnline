@@ -88,10 +88,13 @@ void HalCommonWakeup(void)
 
 void HalCommonFallasleep(void)
 {
+HalInterruptSet(false);
     W25Q64PowerDown();
     HalExtiFreqStop();
     HalTimerStop();
     HalExtiWakeupSet(true);
+    HalExtiLightEnable(true);
+HalInterruptSet(true);
 #if 1
     PWR_EnterSTOPMode(PWR_Regulator_LowPower, PWR_STOPEntry_WFI);
     /*

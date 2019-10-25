@@ -25,7 +25,7 @@ static void menuShowPoll(void)
 {
     MenuFlashData_t *flash = &g_flashData;
     
-    if(flash->enable && SysTimeHasPast(flash->lastTime, 500))
+    if(g_menuActived && flash->enable && SysTimeHasPast(flash->lastTime, 500))
     {
         flash->lightLevel = !flash->lightLevel;
         if(flash->lightLevel)

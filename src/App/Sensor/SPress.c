@@ -11,9 +11,21 @@ static uint16_t pressureValueExchange(uint16_t *data, uint16_t len)
         count += data[i];
     }
 
-    average = (count / len);
+    average = (count / len);//2.1v~2607, 0.1v~124
     printf("press = %d\n", average);
-    result = average * 10 * 25 / 4096; //157.5 = 4096 /25MPa ,10倍存储小数点后一位，显示会自动除10
+    //result = average * 10 * 25 / 4096; //157.5 = 4096 /25MPa ,10倍存储小数点后一位，显示会自动除10
+    if(average > 124)
+    {
+        result = (average - 124) * 60 * 10 / (2607 - 124);
+        if(result > 600)
+        {
+            result = 600;
+        }
+    }
+    else
+    {
+        result = 0;
+    }
     return result;
 }
 
