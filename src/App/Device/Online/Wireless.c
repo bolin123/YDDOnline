@@ -6,7 +6,8 @@
 typedef struct
 {
     char preamble;
-    char mac[SYS_MAC_ADDR_LEN];
+    char mac[3];
+    //char mac;
     char cmd[2];
     char length[4];
 }WirelessHead;
@@ -54,7 +55,7 @@ void WirelessReportData(uint8_t err, uint8_t power, uint16_t *data, uint16_t dat
 
     report->head.preamble = '~';
     sprintf(report->head.mac, "%03d", SysRfAddressGet());
-    //memcpy(report->head.mac, SysMacAddrGet(), SYS_MAC_ADDR_LEN);
+    //report->head.mac = SysRfAddressGet();
     
     report->head.cmd[0] = '0'; //
     report->head.cmd[1] = '1'; //report cmd

@@ -1,11 +1,10 @@
 #include "Temperature.h"
 #include "Sys.h"
 
-#define TEMP_18B20_DQ_PIN 0x03 //pa3
-#define TEMP_18B20_DQ_INPUT() HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_INPUT)
-#define TEMP_18B20_DQ_OUTPUT() HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT)
-#define TEMP_18B20_DQ_SET_LEVEL(x) HalGPIOSetLevel(TEMP_18B20_DQ_PIN, x)
-#define TEMP_18B20_DQ_GET_LEVEL() HalGPIOGetLevel(TEMP_18B20_DQ_PIN)
+#define TEMP_18B20_DQ_INPUT() HalGPIOConfig(HAL_TEMP_18B20_DQ_PIN, HAL_IO_INPUT)
+#define TEMP_18B20_DQ_OUTPUT() HalGPIOConfig(HAL_TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT)
+#define TEMP_18B20_DQ_SET_LEVEL(x) HalGPIOSetLevel(HAL_TEMP_18B20_DQ_PIN, x)
+#define TEMP_18B20_DQ_GET_LEVEL() HalGPIOGetLevel(HAL_TEMP_18B20_DQ_PIN)
 
 static int tempReset(void)
 {
@@ -229,8 +228,8 @@ float TemperatureValueExchange(uint16_t temp)
 void TemperaturePowerOn(void)
 {
 HalInterruptSet(false);
-    HalGPIOConfig(TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT);
-    HalGPIOSetLevel(TEMP_18B20_DQ_PIN, 0);
+    HalGPIOConfig(HAL_TEMP_18B20_DQ_PIN, HAL_IO_OUTPUT);
+    HalGPIOSetLevel(HAL_TEMP_18B20_DQ_PIN, 0);
     tempReset();
     tempWriteByte(0xCC);                        //跳过ROM
     // 设置配置寄存器，精确到9Bit即0.5C'

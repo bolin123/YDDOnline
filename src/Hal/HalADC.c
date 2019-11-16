@@ -3,72 +3,108 @@
 #include "stm32f10x_adc.h"
 #include "stm32f10x_dma.h"
 
+typedef struct
+{
+    uint16_t ioPin;
+    GPIO_TypeDef *ioGroup;
+    uint8_t adChnl;
+    uint8_t adRank;
+    uint8_t adSampleTime;
+}HalADCConfigs_t;
+
 #define HAL_ADC_CHANNEL_COUNT (HAL_SENSOR_ID_COUNT + 1) // 4 capture + 1 voltage
 #define HAL_ADC_CH_BUFF_LEN 12
 #define ADC1_DR_ADDRESS ((uint32_t)0x4001244C)
 
-//static uint16_t g_adcValue[HAL_ADC_CH_BUFF_LEN][HAL_ADC_CHANNEL_COUNT];
+static HalADCConfigs_t ADCConfigs[HAL_ADC_CHANNEL_COUNT] = {
+#if defined(HAL_OLD_DEVICE)
+    /*OUT1*/
+    {
+        .ioPin   = GPIO_Pin_1,
+        .ioGroup = GPIOA,
+        .adChnl  = ADC_Channel_1,
+        .adRank  = 1,
+        .adSampleTime = ADC_SampleTime_1Cycles5,
+    },
+    /*OUT2*/
+    {
+        .ioPin   = GPIO_Pin_7,
+        .ioGroup = GPIOA,
+        .adChnl  = ADC_Channel_7,
+        .adRank  = 2,
+        .adSampleTime = ADC_SampleTime_1Cycles5,
+    },
+    /*OUT3*/
+    {
+        .ioPin   = GPIO_Pin_4,
+        .ioGroup = GPIOC,
+        .adChnl  = ADC_Channel_14,
+        .adRank  = 3,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    },
+    /*OUT4*/
+    {
+        .ioPin   = GPIO_Pin_5,
+        .ioGroup = GPIOC,
+        .adChnl  = ADC_Channel_15,
+        .adRank  = 4,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    },
+    /*power*/
+    {
+        .ioPin   = GPIO_Pin_0,
+        .ioGroup = GPIOC,
+        .adChnl  = ADC_Channel_10,
+        .adRank  = 5,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    }
+#else
+    /*OUT1*/
+    {
+        .ioPin   = GPIO_Pin_6,
+        .ioGroup = GPIOA,
+        .adChnl  = ADC_Channel_6,
+        .adRank  = 1,
+        .adSampleTime = ADC_SampleTime_1Cycles5,
+    },
+    /*OUT2*/
+    {
+        .ioPin   = GPIO_Pin_7,
+        .ioGroup = GPIOA,
+        .adChnl  = ADC_Channel_7,
+        .adRank  = 2,
+        .adSampleTime = ADC_SampleTime_1Cycles5,
+    },
+    /*OUT3*/
+    {
+        .ioPin   = GPIO_Pin_4,
+        .ioGroup = GPIOC,
+        .adChnl  = ADC_Channel_14,
+        .adRank  = 3,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    },
+    /*OUT4*/
+    {
+        .ioPin   = GPIO_Pin_5,
+        .ioGroup = GPIOC,
+        .adChnl  = ADC_Channel_15,
+        .adRank  = 4,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    },
+    /*power*/
+    {
+        .ioPin   = GPIO_Pin_1,
+        .ioGroup = GPIOA,
+        .adChnl  = ADC_Channel_1,
+        .adRank  = 5,
+        .adSampleTime = ADC_SampleTime_71Cycles5,
+    }
+#endif
+}; 
+
 static volatile uint16_t g_adcValue[HAL_ADC_CHANNEL_COUNT];
 static volatile uint16_t g_maxValue[2];
-#if 0
 
-uint16_t HalADCGetValue(uint8_t ch)
-{
-    uint8_t i;
-    uint16_t max = 0, min = 0xffff;
-    uint32_t count = 0;
-
-    if(ch < HAL_ADC_CHANNEL_COUNT)
-    {
-        for(i = 0; i < HAL_ADC_CH_BUFF_LEN; i++)
-        {
-            if(max < g_adcValue[i][ch])
-            {
-                max = g_adcValue[i][ch];
-            }
-            
-            if(min > g_adcValue[i][ch])
-            {
-                min = g_adcValue[i][ch];
-            }
-            count += g_adcValue[i][ch];
-        }
-
-        return (uint16_t)((count - max - min) / (HAL_ADC_CH_BUFF_LEN - 2));
-    }
-//#endif
-    return g_adcValue[ch];
-}
-
-void HalADCGetData(uint16_t *buff)
-{
-//#if 0
-    uint8_t i, ch;
-    uint16_t max = 0, min = 0xffff;
-    uint32_t count = 0;
-
-    for(ch = 0; ch < HAL_SENSOR_ID_COUNT; ch++)
-    {
-        for(i = 0; i < HAL_ADC_CH_BUFF_LEN; i++)
-        {
-            if(max < g_adcValue[i][ch])
-            {
-                max = g_adcValue[i][ch];
-            }
-            
-            if(min > g_adcValue[i][ch])
-            {
-                min = g_adcValue[i][ch];
-            }
-            count += g_adcValue[i][ch];
-        }
-        buff[ch] = (uint16_t)((count - max - min) / (HAL_ADC_CH_BUFF_LEN - 2));
-        count = 0;
-        max = 0;
-        min = 0xffff;
-    }
-}
-#endif
 
 uint16_t HalADCGetCollectValue(uint8_t ch)
 {
@@ -110,7 +146,7 @@ void HalADCStart(void)
 void HalADCInitialize(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
-
+#if 0
     /*
     BAT_DET, PA1 --- ADC123_IN1
     OUT1,    PA6 --- ADC12_IN6
@@ -127,6 +163,15 @@ void HalADCInitialize(void)
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
     GPIO_Init(GPIOC, &GPIO_InitStructure);
+#endif
+    uint8_t i;
+    
+    for(i = 0; i < HAL_ADC_CHANNEL_COUNT; i++)
+    {
+        GPIO_InitStructure.GPIO_Pin = ADCConfigs[i].ioPin; 
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+        GPIO_Init(ADCConfigs[i].ioGroup, &GPIO_InitStructure);
+    }
 
     ADC_InitTypeDef ADC_InitStructure;
     DMA_InitTypeDef DMA_InitStructure;
@@ -193,12 +238,17 @@ void HalADCInitialize(void)
     ADC_Init(ADC1, &ADC_InitStructure);
 
     //规则模式通道配置
+    for(i = 0; i < HAL_ADC_CHANNEL_COUNT; i++)
+    {
+        ADC_RegularChannelConfig(ADC1, ADCConfigs[i].adChnl,  ADCConfigs[i].adRank, ADCConfigs[i].adSampleTime);
+    }
+    /*
     ADC_RegularChannelConfig(ADC1, ADC_Channel_6,  1, ADC_SampleTime_1Cycles5);  //PA6
     ADC_RegularChannelConfig(ADC1, ADC_Channel_7,  2, ADC_SampleTime_1Cycles5);  //PA7 
     ADC_RegularChannelConfig(ADC1, ADC_Channel_14, 3, ADC_SampleTime_71Cycles5); //PC4 
     ADC_RegularChannelConfig(ADC1, ADC_Channel_15, 4, ADC_SampleTime_71Cycles5); //PC5
     ADC_RegularChannelConfig(ADC1, ADC_Channel_1,  5, ADC_SampleTime_71Cycles5); //PA1 
-
+    */
     //使能ADC1的DMA
     ADC_DMACmd(ADC1, ENABLE);
 

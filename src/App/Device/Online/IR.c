@@ -13,8 +13,7 @@ typedef struct
 }IrRxData_t;
 #pragma pack()
 
-#define IR_TX_EN_PIN 0x27  //pc7
-#define IR_TX_EN_ENABLE_LEVEL 
+#define IR_TX_EN_ENABLE_LEVEL 1
 
 static volatile uint32_t g_irTimerCount = 0;
 static volatile uint8_t g_irKey = 0;
@@ -141,9 +140,9 @@ void IRSendData(uint8_t *data, uint8_t len)
     
 HalInterruptSet(false);
     HalPWMEnable(true);
-    HalGPIOSetLevel(IR_TX_EN_PIN, 1);
+    HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
     HalWaitMs(9);
-    HalGPIOSetLevel(IR_TX_EN_PIN, 0);
+    HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
     //HalPWMEnable(false);
     HalWaitUs(4500);
 
@@ -151,41 +150,43 @@ HalInterruptSet(false);
     {
         for(i = 0; i < 8; i++)
         {
-            if(data[j] & (0x01 << i))
+            if(data[j] & (0x80 >> i))
             {
-                HalGPIOSetLevel(IR_TX_EN_PIN, 1);
+                HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
                 //HalPWMEnable(true);
                 HalWaitUs(560);
                 
-                HalGPIOSetLevel(IR_TX_EN_PIN, 0);
+                HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
                 //HalPWMEnable(false);
                 HalWaitUs(1690);
             }
             else
             {
-                HalGPIOSetLevel(IR_TX_EN_PIN, 1);
+                HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
                 //HalPWMEnable(true);
                 HalWaitUs(560);
                 
-                HalGPIOSetLevel(IR_TX_EN_PIN, 0);
+                HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
                 //HalPWMEnable(false);
                 HalWaitUs(560);
             }
         }
     }
-    
+    HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
+    HalWaitUs(560);
 HalInterruptSet(true);
     HalPWMEnable(false);
     //HalGPIOSetLevel(IR_TX_EN_PIN, 0);
 }
 
+
 static void irPMSleep(struct PM_st *pm)
 {
     if(pm)
     {
-        HalExtiIRRecvEnable(false);
+        HalExitSet(HAL_EXIT_IR_INPUT, false);
         HalIRRecvTimerEnable(false);
-        HalGPIOSetLevel(IR_TX_EN_PIN, 0);
+        HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
         pm->status = PM_STATUS_SLEEP;
     }
 }
@@ -194,9 +195,9 @@ static void irPMWakeup(struct PM_st *pm, PMWakeupType_t type)
 {
     if(pm && pm->status == PM_STATUS_SLEEP && PM_WAKEUP_TYPE_LIGHT == type)
     {
-        HalExtiIRRecvEnable(true);
+        HalExitSet(HAL_EXIT_IR_INPUT, true);
         HalIRRecvTimerEnable(true);
-        HalGPIOSetLevel(IR_TX_EN_PIN, 1);
+        HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
         pm->status = PM_STATUS_WAKEUP;
     }
 }
@@ -214,9 +215,9 @@ static void irPMRegist(void)
 
 void IRInit(IRKeyHandle_t handle)
 {
-    HalGPIOConfig(IR_TX_EN_PIN, HAL_IO_OUTPUT);
-    HalGPIOSetLevel(IR_TX_EN_PIN, 1);
-    HalExtiIRRecvEnable(true);
+    HalGPIOConfig(HAL_IR_TX_EN_PIN, HAL_IO_OUTPUT);
+    HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
+    HalExitSet(HAL_EXIT_IR_INPUT, true);
     HalIRRecvTimerEnable(true);
     irPMRegist();
     g_keyEventHandle = handle;

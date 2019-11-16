@@ -19,7 +19,8 @@
 static Sensors_t *g_sensors = NULL;
 static SensorsContext_t g_sensorContext[HAL_SENSOR_ID_COUNT];
 static bool g_queryRecved = false;
-//static bool g_sleepEnable = true;
+static volatile bool g_startLightDetect = false;
+static uint32_t g_lightDetectTime;
 
 static void yddWakeup(PM_t *pm, PMWakeupType_t type)
 {
@@ -28,10 +29,9 @@ static void yddWakeup(PM_t *pm, PMWakeupType_t type)
     {
         if(pm->status != PM_STATUS_WAKEUP)
         {
-            HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_ENABLE_LEVEL);
             TemperaturePowerOn();
         }
-        
+        /*
         if(type == PM_WAKEUP_TYPE_LIGHT)
         {
             DispLoopStart(2);
@@ -40,10 +40,42 @@ static void yddWakeup(PM_t *pm, PMWakeupType_t type)
         else
         {
             PMStartSleep(2000);
+        }*/
+        if(type == PM_WAKEUP_TYPE_LIGHT)
+        {
+            g_startLightDetect = true;
+            g_lightDetectTime = SysTime();
+        }
+        else
+        {
+            HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_ENABLE_LEVEL);
+            PMStartSleep(2000);
         }
         pm->status = PM_STATUS_WAKEUP;
     }
     
+}
+
+static void lightActiveDetect(void)
+{
+    if(g_startLightDetect)
+    {
+        if(HalGPIOGetLevel(HAL_LIGHT_IRQ_PIN))
+        {
+            g_startLightDetect = false;
+            PMStartSleep(500);
+        }
+        else
+        {
+  
+            if(SysTimeHasPast(g_lightDetectTime, 2000))
+            {
+                DispLoopStart(2);
+                SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+                g_startLightDetect = false;
+            }
+        }
+    }
 }
 
 static void yddSleep(PM_t *pm)
@@ -295,7 +327,7 @@ void YDDOnlineLightActive(void)
 {
     if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
     {
-        HalExtiLightEnable(false);
+        HalExitSet(HAL_EXIT_LIGHT_WAKEUP, false);
         PMWakeup(PM_WAKEUP_TYPE_LIGHT);
     }
     else
@@ -398,7 +430,7 @@ static void displayInit(void)
         DispLoopRegister(DISPLOOP_ID_PRESS1, disploopGetValue);
         DispLoopRegister(DISPLOOP_ID_PRESS2, disploopGetValue);
     }
-    
+
     //DispLoopRegister(DISPLOOP_ID_ERRCODE, disploopGetValue);
     //DispLoopRegister(DISPLOOP_ID_POWER,   disploopGetValue);
 
@@ -484,5 +516,6 @@ void YDDOnlinePoll(void)
     DispLoopPoll();
     MenuPoll();
     IRPoll();
+		lightActiveDetect();
 }
 

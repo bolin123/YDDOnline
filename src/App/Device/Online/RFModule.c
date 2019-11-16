@@ -384,7 +384,7 @@ static void rfModulePowerInit(void)
 void RFModuleInit(RFModuleEvent_cb eventcb)
 {   
     uartInit();
-    HalExtiWakeupSet(true);
+    HalExitSet(HAL_EXIT_433MODULE_WAKEUP, true);
     rfModulePowerInit();
     //rfModuleDetect();
     g_rfModuleEventHandle = eventcb;

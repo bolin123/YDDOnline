@@ -10,9 +10,11 @@ static uint8_t g_segCode[] = {
 /*
 LED_D3, LED_D1, LED_D7, LED_D5, LED_D4, LED_D2, LED_D8, LED_D6
 */
-//static uint8_t g_segPin[] = {0x33, 0x16, 0x2c, 0x31, 0x32, 0x34, 0x2b, 0x30};
+#if defined(HAL_OLD_DEVICE)
+static uint8_t g_segPin[] = {0x33, 0x16, 0x2c, 0x31, 0x32, 0x34, 0x2b, 0x30};
+#else
 static uint8_t g_segPin[] = {0x36, 0x13, 0x32, 0x34, 0x35, 0x37, 0x31, 0x33};
-
+#endif
 /*
 MCU_P97, MCU_P96, MCU_P95, MCU_P93
 */
@@ -98,6 +100,10 @@ static void ledPMWakeup(PM_t *pm, PMWakeupType_t type)
     {
         HalGPIOSetLevel(HAL_IR_POWER_PIN, HAL_IR_POWER_ENABLE_LEVEL); //power on
         DigitalLEDOn();
+        for(uint8_t i = 0; i < DIGITAL_LED_ID_COUNT; i++)
+        {
+            DigitalLEDSetChars((DigitalLEDId_t)i, 23, false);
+        }
         pm->status = PM_STATUS_WAKEUP;
     }
 }

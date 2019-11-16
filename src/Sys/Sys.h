@@ -12,7 +12,7 @@
 
 #define Syslog(...) do{printf("[%s]: ", __FUNCTION__); printf(__VA_ARGS__); printf("\r\n");}while(0)
 
-#define SYS_MAC_ADDR_LEN 3
+//#define SYS_MAC_ADDR_LEN 3
 
 typedef enum
 {

@@ -25,6 +25,36 @@ typedef enum
     HAL_DEVICE_TYPE_GEO,        //地音地磁
 }HalDeviceType_t;
 
+#if defined(HAL_OLD_DEVICE)
+
+#define HAL_IO_UART_PIN  0x3c  //模拟串口IO PD12
+#define HAL_STATUS_LED_PIN     0x41  //PE1
+#define HAL_STATUS_LED_ENABLE_LEVEL  0
+#define HAL_STATUS_LED_DISABLE_LEVEL 1
+
+#define HAL_SENSORS_POWER_PIN 0x2d //PC13
+#define HAL_SENSORS_POWER_ENABLE_LEVEL  1
+#define HAL_SENSORS_POWER_DISABLE_LEVEL 0
+
+#define HAL_485_POWER_PIN     0x0c //PA12
+#define HAL_485_POWER_ENABLE_LEVEL  0
+#define HAL_485_POWER_DISABLE_LEVEL 1
+
+#define HAL_IR_POWER_PIN      0x42
+#define HAL_IR_POWER_ENABLE_LEVEL  0
+#define HAL_IR_POWER_DISABLE_LEVEL 1
+
+#define HAL_IR_INPUT_PIN      0x43  //pe3
+
+#define HAL_LIGHT_IRQ_PIN    0x46 //pe6
+#define HAL_LIGHT_ACTIVE_LEVEL 0
+
+#define HAL_TEMP_18B20_DQ_PIN 0x3b //pd11
+#define HAL_WIRED_PROTO_485DE_PIN 0x0b //pa11
+#define HAL_IR_TX_EN_PIN 0x45  //pe5
+
+#else //new one
+
 #define HAL_IO_UART_PIN  0x21  //模拟串口IO Pc1
 #define HAL_STATUS_LED_PIN     0x41  //PE1
 #define HAL_STATUS_LED_ENABLE_LEVEL  0
@@ -44,6 +74,14 @@ typedef enum
 
 #define HAL_IR_INPUT_PIN      0x30  //pd0
 
+#define HAL_LIGHT_IRQ_PIN    0x26 //pc6
+#define HAL_LIGHT_ACTIVE_LEVEL 0
+
+#define HAL_TEMP_18B20_DQ_PIN 0x03 //pa3
+#define HAL_WIRED_PROTO_485DE_PIN 0x0b //pa11
+#define HAL_IR_TX_EN_PIN 0x27  //pc7
+
+#endif
 
 //#define HAL_ADC_CH_NUM 4
 #define HAL_DAC_BASE_VALUE 1830 //1.51, 1.515v = 1892

@@ -81,8 +81,9 @@ void HalCommonWakeup(void)
     SystemInit();
     periphClockInit(true);
     HalTimerStart();
-    HalExtiWakeupSet(false);
-    HalExtiFreqStart();
+    HalExitSet(HAL_EXIT_433MODULE_WAKEUP, false);
+    HalExitSet(HAL_EXIT_NOISE_FREQ_CAPTRUE, true);
+    HalExitSet(HAL_EXIT_GEOM_FREQ_CAPTRUE, true);
     W25Q64Wakeup();
 }
 
@@ -90,10 +91,11 @@ void HalCommonFallasleep(void)
 {
 HalInterruptSet(false);
     W25Q64PowerDown();
-    HalExtiFreqStop();
+    HalExitSet(HAL_EXIT_NOISE_FREQ_CAPTRUE, false);
+    HalExitSet(HAL_EXIT_GEOM_FREQ_CAPTRUE, false);
     HalTimerStop();
-    HalExtiWakeupSet(true);
-    HalExtiLightEnable(true);
+    HalExitSet(HAL_EXIT_433MODULE_WAKEUP, true);
+    HalExitSet(HAL_EXIT_LIGHT_WAKEUP, true);
 HalInterruptSet(true);
 #if 1
     PWR_EnterSTOPMode(PWR_Regulator_LowPower, PWR_STOPEntry_WFI);
@@ -117,7 +119,8 @@ static void halInit(void)
 {
     HalGPIOConfig(HAL_IO_UART_PIN, HAL_IO_OUTPUT);    
     HalTimerStart();
-    HalExtiFreqStart(); 
+    HalExitSet(HAL_EXIT_NOISE_FREQ_CAPTRUE, true);
+    HalExitSet(HAL_EXIT_GEOM_FREQ_CAPTRUE, true); 
 }
 
 uint16_t HalCommonInitialize(void)
