@@ -7,7 +7,7 @@
 
 #define HAL_FLASH_INVALID_ADDR 0xffffffff
 
-#define HAL_DEVICE_TYPE 1
+//#define HAL_DEVICE_DATA_PACKET_LENGTH (6 + 8)
 
 typedef enum
 {
@@ -24,6 +24,40 @@ typedef enum
     HAL_DEVICE_TYPE_PRESS,      //应力
     HAL_DEVICE_TYPE_GEO,        //地音地磁
 }HalDeviceType_t;
+    
+#define HAL_DEVICE_TYPE HAL_DEVICE_TYPE_PRESS
+
+#pragma pack(1)
+typedef struct
+{
+    uint8_t address;
+    uint8_t type;
+    uint8_t errcode;
+    uint8_t power;
+    uint32_t utc;
+    struct
+    {
+        uint16_t temperate;  //温度
+        
+    #if (HAL_DEVICE_TYPE == 1)
+        uint16_t press1;     //应力1值
+        uint16_t press2;     //应力2值
+    #else
+        uint16_t geoAmplitue;   //电磁强度
+        uint16_t geoFrequency;  //电磁脉冲数
+        uint16_t geoEvent;      //电磁事件数
+        uint16_t geoEnergy;     //电磁能量值
+        uint16_t noiseAmplitue; //地音强度
+        uint16_t noiseFrequency;//地音振铃数
+        uint16_t noiseEvent;    //地音事件数
+        uint16_t noiseEnergy;   //地音能量值
+    #endif
+    }data;
+}HalDeviceDataStorage_t;
+#pragma pack()
+
+#define HAL_DEVICE_DATA_PACKET_LENGTH sizeof(HalDeviceDataStorage_t)
+
 
 #if defined(HAL_OLD_DEVICE)
 

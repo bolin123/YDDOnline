@@ -15,6 +15,10 @@ typedef struct
     uint8_t second;
 }HalRTCTime_t;
 
+uint32_t HalRTCGetUtc(void);
+int HalRTCSetUtc(uint32_t utc);
+void HalRTCAlarmSet(uint16_t seconds);
+
 int HalRTCSetTime(HalRTCTime_t *time);
 HalRTCTime_t * HalRTCGetTime(void);
 uint16_t HalRTCInit(void);

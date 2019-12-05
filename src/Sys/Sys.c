@@ -14,6 +14,7 @@ typedef struct
     uint8_t rfChnl;
     uint8_t devType;
     uint16_t threshold;
+    uint16_t queryTime;
     SysCommunicateType_t commType; //通信方式 1=无线，2=有线
 }SysConfig_t;
 
@@ -115,6 +116,18 @@ void SysRfAddressSet(uint8_t addr)
     HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
 }
 
+uint16_t SysQueryIntervalGet(void)
+{
+    return g_sysConfig.queryTime;
+}
+
+void SysQueryIntervalSet(uint16_t time)
+{
+    g_sysConfig.queryTime = time;
+    Syslog("time = %d", time);
+    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
+}
+
 uint8_t SysRfAddressGet(void)
 {
     return g_sysConfig.rfAddr;
@@ -167,6 +180,7 @@ static void startupInit(void)
         g_sysConfig.rfChnl = 0x01;
         g_sysConfig.devType = HAL_DEVICE_TYPE_PRESS;
         g_sysConfig.threshold = 50;
+        g_sysConfig.queryTime = 60; //1min
         g_sysConfig.commType = SYS_COMMUNICATE_TYPE_WIRELESS; //默认为无线通信
         HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
     }
@@ -176,6 +190,7 @@ static void startupInit(void)
     printf("--Firmware version:%s\r\n", SYS_FIRMWARE_VERSION);
     printf("--Device type:%d, threshold = %d\r\n", g_sysConfig.devType, g_sysConfig.threshold);
     printf("--Device address:%d, rf channel:%d\r\n", g_sysConfig.rfAddr, g_sysConfig.rfChnl);
+    printf("--Query interval: %d\r\n", g_sysConfig.queryTime);
     printf("--Communication type: %s,%d\r\n", g_sysConfig.commType == SYS_COMMUNICATE_TYPE_WIRELESS ? "WIRELESS":"WIRED", g_sysConfig.commType);
     SysDateTime_t *time = SysDateTime();
     printf("--Now: %d-%02d-%02d %02d:%02d:%02d\r\n", time->year, time->month, time->day, 

@@ -1,14 +1,42 @@
 #include "HalRTC.h"
 #include "HalWait.h"
+#include "PowerManager.h"
+#include "stm32f10x_rtc.h"
+#include "stm32f10x_exti.h"
+
+static void rtcIrqConfig(void)
+{
+    
+    NVIC_InitTypeDef NVIC_InitStructure;        
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    NVIC_InitStructure.NVIC_IRQChannel = RTCAlarm_IRQn;      //RTC全局中断的中断配置
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;   
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;  
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;     
+    NVIC_Init(&NVIC_InitStructure); 
+    
+    EXTI_InitTypeDef EXTI_InitStructure;
+
+    EXTI_InitStructure.EXTI_Line = EXTI_Line17;
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+    
+    RTC_ITConfig(RTC_FLAG_ALR, ENABLE);
+    RTC_WaitForLastTask();	//等待最近一次对RTC寄存器的写操作完成
+
+}
 
 uint16_t HalRTCInit(void)
 {
     uint32_t errcount = 0;
+    
+    PWR_BackupAccessCmd(ENABLE);                //使能后备寄存器访问 
 
     if(BKP_ReadBackupRegister(BKP_DR1) != 0x5050) //从指定的后备寄存器中读出数据:读出了与写入的指定数据不相乎
     {
-        RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE); //使能PWR和BKP外设时钟	 
-        PWR_BackupAccessCmd(ENABLE);                //使能后备寄存器访问 
         BKP_DeInit();                               //复位备份区域	
         RCC_LSEConfig(RCC_LSE_ON);                  //设置外部低速晶振(LSE),使用外设低速晶振
 
@@ -28,7 +56,7 @@ uint16_t HalRTCInit(void)
         RTC_WaitForLastTask();                      //等待最近一次对RTC寄存器的写操作完成
         RTC_WaitForSynchro();                       //等待RTC寄存器同步	
 
-        //RTC_ITConfig(RTC_IT_SEC, ENABLE);		//使能RTC秒中断
+        //RTC_ITConfig(RTC_IT_ALR, ENABLE);		//使能RTC秒中断
         //RTC_WaitForLastTask();	//等待最近一次对RTC寄存器的写操作完成
         RTC_EnterConfigMode();                      /// 允许配置	
         RTC_SetPrescaler(32767);                    //设置RTC预分频的值
@@ -54,8 +82,43 @@ uint16_t HalRTCInit(void)
             return HAL_EXCEPTION_ID_RTC;
         }
     }
-
+    rtcIrqConfig();
     return 0;
+}
+
+void HalRTCAlarmSet(uint16_t seconds)
+{
+    printf("RTC alarm time = %d\n", seconds);
+    
+    RTC_SetAlarm(RTC_GetCounter() + seconds);
+    RTC_WaitForLastTask();
+#if 0
+    RCC->APB1ENR|=1<<28;
+    RCC->APB1ENR|=1<<27;
+    PWR->CR|=1<<8;   
+
+    RTC->CRL|=1<<4;   
+    RTC->CRH|=1<<1;  
+    RTC->ALRL=seconds&0xffff;
+    RTC->ALRH=seconds>>16;
+    RTC->CRL&=~(1<<4);
+#endif
+}
+
+
+void RTCAlarm_IRQHandler(void)
+{
+    PMWakeup(PM_WAKEUP_TYPE_RTC);
+    EXTI_ClearITPendingBit(EXTI_Line17);
+}
+
+void RTC_IRQHandler(void)
+{
+    if(RTC_GetITStatus(RTC_IT_ALR)!= RESET)//闹钟中断
+    {
+        //PMWakeup(PM_WAKEUP_TYPE_RTC);
+        RTC_ClearITPendingBit(RTC_IT_ALR);  //清闹钟中断
+    }
 }
 
 
@@ -136,6 +199,31 @@ int HalRTCSetTime(HalRTCTime_t *time)
         return -1;
     }
     return 0;
+}
+
+int HalRTCSetUtc(uint32_t utc)
+{
+    uint16_t errcount = 0;
+    
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);
+    PWR_BackupAccessCmd(ENABLE);
+    RTC_SetCounter(utc);
+
+    while(((RTC->CRL & RTC_FLAG_RTOFF) == (uint16_t) RESET) && (errcount < 200))
+    {
+        errcount++;
+        HalWaitMs(10);
+    }
+    if((RTC->CRL & RTC_FLAG_RTOFF) == (uint16_t) RESET)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+uint32_t HalRTCGetUtc(void)
+{
+    return RTC_GetCounter();
 }
 
 HalRTCTime_t * HalRTCGetTime(void)

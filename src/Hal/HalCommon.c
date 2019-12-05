@@ -74,6 +74,7 @@ static void periphClockInit(bool enable)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, state);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, state);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC , state);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, state); //使能PWR和BKP外设时钟   
 }
 
 void HalCommonWakeup(void)

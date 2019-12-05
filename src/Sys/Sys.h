@@ -28,6 +28,10 @@ int SysDateTimeSet(SysDateTime_t *dateTime);
 
 SysCommunicateType_t SysCommunicateTypeGet(void);
 void SysCommunicateTypeSet(SysCommunicateType_t type);
+
+void SysQueryIntervalSet(uint16_t time);
+uint16_t SysQueryIntervalGet(void);
+
 uint8_t SysRfAddressGet(void);
 void SysRfAddressSet(uint8_t addr);
 uint8_t SysRfChannelGet(void);

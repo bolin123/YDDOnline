@@ -3,9 +3,10 @@
 
 typedef enum
 {
-    PM_WAKEUP_TYPE_NONE = 0x00,
+    PM_WAKEUP_TYPE_NONE     = 0x00,
     PM_WAKEUP_TYPE_WIRELESS = 0x01, //ÎÞÏß»½ÐÑ
-    PM_WAKEUP_TYPE_LIGHT = 0x02,  //µÆ¹â»½ÐÑ
+    PM_WAKEUP_TYPE_LIGHT    = 0x02,  //µÆ¹â»½ÐÑ
+    PM_WAKEUP_TYPE_RTC      = 0x04,
 }PMWakeupType_t;
 
 typedef enum

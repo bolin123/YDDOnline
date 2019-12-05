@@ -13,42 +13,75 @@
 #include "WiredProto.h"
 #include "DispLoop.h"
 #include "Menu.h"
+#include "DataManager.h"
 
 #define YDD_FALL_SLEEP_DELAY 1000
+
+#pragma pack(1)
+typedef struct 
+{
+    uint8_t address;
+    uint8_t type;
+    uint8_t errcode;
+    uint8_t power;
+    uint32_t utc;
+    struct
+    {
+        uint16_t temperate;
+        uint16_t press1;
+        uint16_t press2;
+    }data;
+}DeviceStorageData_t;
+#pragma pack()
+
 
 static Sensors_t *g_sensors = NULL;
 static SensorsContext_t g_sensorContext[HAL_SENSOR_ID_COUNT];
 static bool g_queryRecved = false;
 static volatile bool g_startLightDetect = false;
 static uint32_t g_lightDetectTime;
+static volatile uint8_t g_lostQueryCount = 0;
+
+static bool needStorageData(void)
+{
+    return g_lostQueryCount > 2 ? true : false;
+}
 
 static void yddWakeup(PM_t *pm, PMWakeupType_t type)
 {
-    //Syslog("type = %d", type);
+    //printf("type = %d\n", type);
     if(pm)
     {
         if(pm->status != PM_STATUS_WAKEUP)
         {
             TemperaturePowerOn();
         }
-        /*
-        if(type == PM_WAKEUP_TYPE_LIGHT)
-        {
-            DispLoopStart(2);
-            SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
-        }
-        else
-        {
-            PMStartSleep(2000);
-        }*/
+
         if(type == PM_WAKEUP_TYPE_LIGHT)
         {
             g_startLightDetect = true;
             g_lightDetectTime = SysTime();
         }
-        else
+        else if(type == PM_WAKEUP_TYPE_WIRELESS)
         {
             HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_ENABLE_LEVEL);
+            PMStartSleep(2000);
+        }
+        else if(type == PM_WAKEUP_TYPE_RTC)
+        {
+            if(needStorageData())
+            {
+                SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+                PMStartSleep(2000);
+            }
+            else
+            {
+                g_lostQueryCount++;
+                PMStartSleep(500);
+            }
+        }
+        else
+        {
             PMStartSleep(2000);
         }
         pm->status = PM_STATUS_WAKEUP;
@@ -85,6 +118,14 @@ static void yddSleep(PM_t *pm)
         Syslog("");
         DispLoopStop();
         MenuDeactive();
+        if(PMIsTypeWakeup(PM_WAKEUP_TYPE_WIRELESS))
+        {
+            HalRTCAlarmSet(SysQueryIntervalGet() / 2 + SysQueryIntervalGet());
+        }else if(PMIsTypeWakeup(PM_WAKEUP_TYPE_RTC))
+        {
+            HalRTCAlarmSet(SysQueryIntervalGet());
+        }
+        
         HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_DISABLE_LEVEL);
         
         pm->status = PM_STATUS_SLEEP;
@@ -128,14 +169,7 @@ static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
                 reportData[i++] = g_sensorContext[HAL_SENSOR_ID_NOISE].frequency;
             }
             
-        #if 0
-            data = &reportData[1];
-            for(i = 0; i < HAL_SENSOR_ID_COUNT; i++)
-            {
-                data[i*2] = g_sensorContext[i].amplitude;
-                data[i*2 + 1] = g_sensorContext[i].frequency;
-            }
-        #endif
+
             if(g_queryRecved)
             {
                 if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
@@ -149,11 +183,22 @@ static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
                 }
                 g_queryRecved = false;
             }
-            
 
-           
-    
-        //PMWakeup();// TODO: test,
+            if(PMIsTypeWakeup(PM_WAKEUP_TYPE_RTC) && needStorageData())
+            {
+                DeviceStorageData_t storage;
+                printf("storage\n");
+                storage.address = SysRfAddressGet();
+                storage.type    = SysDeviceTypeGet();
+                storage.errcode = SysErrorCode();
+                storage.power   = SysPowerPercent();
+                storage.utc     = HalRTCGetUtc();
+                storage.data.temperate = (uint16_t)(temperature * 10);
+                storage.data.press1    = g_sensorContext[HAL_SENSOR_ID_PRESS1].amplitude;
+                storage.data.press2    = g_sensorContext[HAL_SENSOR_ID_PRESS2].amplitude;
+                DataManagerStorage((uint8_t *)&storage, sizeof(DeviceStorageData_t));
+            }
+
     }
 }
 
@@ -162,14 +207,34 @@ void YDDOnlineSensorFreqTrigger(uint8_t ch)
     SensorsFrequencyTrigger(g_sensors, (HalSensorID_t)ch);
 }
 
+static void updateQueryTime(void)
+{
+    static uint32_t lastQueryTime = 0;
+    int newInterval, oldInterval;
+
+    if(lastQueryTime != 0)
+    {
+        newInterval = HalRTCGetUtc() - lastQueryTime;
+        oldInterval = SysQueryIntervalGet();
+        
+        if(abs(oldInterval - newInterval) > 5)
+        {
+            SysQueryIntervalSet(newInterval);
+        }
+    }
+    lastQueryTime = HalRTCGetUtc();    
+}
+
 static void wirelessEventHandle(WirelessEvent_t event, void *args)
 {
     if(event == WIRELESS_EVENT_QUERY)
     {
         g_queryRecved = true;
+        g_lostQueryCount = 0;
         Syslog("sensor sampling...");
         SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
         PMStartSleep(2000);
+        updateQueryTime();
     }
 }
 
@@ -497,6 +562,9 @@ void YDDOnlineInit(void)
         WiredProtoInit(wiredQueryCallback);
     }
     IRInit(irKeyEventHandle);
+    DataManagerInit();
+    
+    HalRTCAlarmSet(SysQueryIntervalGet() / 2 + SysQueryIntervalGet());
     // TODO:test
     //HalADCStop();// TODO: test,
     //PMWakeup();// TODO: test,
@@ -516,6 +584,6 @@ void YDDOnlinePoll(void)
     DispLoopPoll();
     MenuPoll();
     IRPoll();
-		lightActiveDetect();
+	lightActiveDetect();
 }
 
