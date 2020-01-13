@@ -2,22 +2,24 @@
 #include "Sys.h"
 #include "PowerManager.h"
 
-#define IR_DATA_FACTORY_CODE 0x80bf
+#define IR_DATA_FACTORY_CODE 'T'
+#define IR_PREAMBLE_CODE_LEN 2
+//#define IR_RECV_DATA_LEN (2 + IR_SEND_PACKET_LEN)
 
-#pragma pack(1)
 typedef struct
 {
-    uint8_t complementCode;
-    uint8_t rawCode;
-    uint16_t factory;
-}IrRxData_t;
-#pragma pack()
+    uint8_t head;
+    uint8_t cmd;
+    uint8_t pid;
+    uint8_t content[IR_SEND_PACKET_LEN];
+}IRData_t;
 
 #define IR_TX_EN_ENABLE_LEVEL 1
 
 static volatile uint32_t g_irTimerCount = 0;
-static volatile uint8_t g_irKey = 0;
 static IRKeyHandle_t g_keyEventHandle;
+static volatile bool g_gotIRPacket = false;
+static uint8_t g_recvBuff[sizeof(IRData_t)];
 
 void IRRecvTimerHandle(void)
 {
@@ -29,27 +31,30 @@ static void resetTimerCount(void)
     g_irTimerCount = 0;
 }
 
-static uint8_t getKeyValue(uint32_t value)
+static void irPacketHandle(void)
 {
-    IrRxData_t *irData = (IrRxData_t *)&value;
-   
-    if(irData->factory == IR_DATA_FACTORY_CODE && (uint8_t)~irData->complementCode == irData->rawCode)
+    IRData_t *recvData = (IRData_t *)g_recvBuff; 
+    if(g_gotIRPacket)
     {
-        //printf("value = %02x\n", irData->rawCode);
-        return irData->rawCode;
+        if(recvData->head == IR_DATA_FACTORY_CODE)
+        {
+            g_keyEventHandle(recvData->cmd, recvData->content);
+        }
+        g_gotIRPacket = false;
     }
-
-    return 0;
 }
 
 void IRRecvBits(void)
 {
     static uint8_t recvnum = 0;
     static uint32_t lastTime;
-    static uint32_t irValue = 0;
     uint32_t bit;
-//    uint8_t buff[4];
 
+    if(g_gotIRPacket)
+    {
+        return ;
+    }
+    
     if(SysTimeHasPast(lastTime, 150))
     {
         recvnum = 0;
@@ -60,8 +65,7 @@ void IRRecvBits(void)
     if(recvnum == 1)
     {
         resetTimerCount();
-        irValue = 0;
-        //HalIRRecvTimerEnable(true);
+        //irValue = 0;
     }
     else if(recvnum == 2)
     {
@@ -87,87 +91,53 @@ void IRRecvBits(void)
         }
         resetTimerCount();
 
-        //g_irValue |= bit << (recvnum - 2); 
-        irValue = (irValue << 1) + bit;
+        g_recvBuff[(recvnum - IR_PREAMBLE_CODE_LEN - 1) / 8] = (g_recvBuff[(recvnum - IR_PREAMBLE_CODE_LEN - 1) / 8] << 1) + bit;
         
-        if(recvnum == 34)
+        if(recvnum == sizeof(g_recvBuff) * 8 + IR_PREAMBLE_CODE_LEN)
         {
-            //printf("ir value:%04x\n", g_irValue);
-            g_irKey = getKeyValue(irValue);
+            g_gotIRPacket = true;
+            recvnum = 0;
         }
     }
 }
 
-static void irKeyHandle(void)
-{
-    IRKey_t value = IR_KEY_INVALID;
-    if(g_irKey)
-    {
-        switch (g_irKey)
-        {
-        case 0x6b://menu
-            value = IR_KEY_MENU;
-            break;
-        case 0x53://up
-            value = IR_KEY_UP;
-            break;
-        case 0x4b://down
-            value = IR_KEY_DOWN;
-            break;
-        case 0x99://left
-            value = IR_KEY_LEFT;
-            break;
-        case 0x83://right
-            value = IR_KEY_RIGHT;
-            break;
-        case 0x73://enter
-            value = IR_KEY_ENTER;
-            break;
-        case 0xa3://cancel
-            value = IR_KEY_CANCEL;
-            break;
-        default:
-            break;
-        }
-        g_keyEventHandle(value);
-        g_irKey = 0;
-    }
-}
 
-void IRSendData(uint8_t *data, uint8_t len)
+void IRSendData(IRKey_t key, uint8_t pid, uint8_t data[IR_SEND_PACKET_LEN])
 {
     uint8_t i, j;
+    IRData_t irData;
+    uint8_t *txData = (uint8_t *)&irData;
+
+    irData.head = IR_DATA_FACTORY_CODE;
+    irData.cmd = (uint8_t)key;
+    irData.pid = pid;
+    memcpy(irData.content, data, sizeof(irData.content));
     
 HalInterruptSet(false);
     HalPWMEnable(true);
     HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
     HalWaitMs(9);
     HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
-    //HalPWMEnable(false);
     HalWaitUs(4500);
 
-    for(j = 0; j < len; j++)
+    for(j = 0; j < sizeof(IRData_t); j++)
     {
         for(i = 0; i < 8; i++)
         {
-            if(data[j] & (0x80 >> i))
+            if(txData[j] & (0x80 >> i))
             {
                 HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
-                //HalPWMEnable(true);
                 HalWaitUs(560);
                 
                 HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
-                //HalPWMEnable(false);
                 HalWaitUs(1690);
             }
             else
             {
                 HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 0);
-                //HalPWMEnable(true);
                 HalWaitUs(560);
                 
                 HalGPIOSetLevel(HAL_IR_TX_EN_PIN, 1);
-                //HalPWMEnable(false);
                 HalWaitUs(560);
             }
         }
@@ -176,7 +146,6 @@ HalInterruptSet(false);
     HalWaitUs(560);
 HalInterruptSet(true);
     HalPWMEnable(false);
-    //HalGPIOSetLevel(IR_TX_EN_PIN, 0);
 }
 
 
@@ -225,6 +194,6 @@ void IRInit(IRKeyHandle_t handle)
 
 void IRPoll(void)
 {
-    irKeyHandle();
+    irPacketHandle();
 }
 

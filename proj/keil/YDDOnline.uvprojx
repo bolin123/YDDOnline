@@ -49,7 +49,7 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>YDDOnline_slave</OutputName>
+          <OutputName>YDDOnlinePress</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>1</CreateHexFile>
@@ -80,10 +80,10 @@
             <nStopB2X>0</nStopB2X>
           </BeforeMake>
           <AfterMake>
-            <RunUserProg1>0</RunUserProg1>
-            <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name></UserProg1Name>
-            <UserProg2Name></UserProg2Name>
+            <RunUserProg1>1</RunUserProg1>
+            <RunUserProg2>1</RunUserProg2>
+            <UserProg1Name>xcopy Objects\*.hex ..\..\img /Y</UserProg1Name>
+            <UserProg2Name>C:\Keil_v5\ARM\ARMCC\bin\fromelf.exe --bin -o  ..\..\img\YDDOnlinePress.bin Objects\YDDOnline.axf</UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
             <nStopA1X>0</nStopA1X>
@@ -525,6 +525,16 @@
               <FileName>WiredProto.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\src\App\Device\Online\WiredProto.c</FilePath>
+            </File>
+            <File>
+              <FileName>DataManager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\DataManager.c</FilePath>
+            </File>
+            <File>
+              <FileName>IRDataTransfer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\src\App\Device\Online\IRDataTransfer.c</FilePath>
             </File>
           </Files>
         </Group>

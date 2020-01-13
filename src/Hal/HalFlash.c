@@ -25,6 +25,21 @@ void HalFlashPoll(void)
 
 }
 
+void HalFlashOTAWrite(uint32_t offset, uint8_t *data, uint16_t length)
+{
+    flashWrite(HAL_OTA_FLASH_ADDR + offset, data, length);
+}
+
+void HalFlashOTAErase(uint32_t length)
+{
+    uint16_t page = (length + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+    uint16_t i;
+
+    for(i = 0; i < page; i++)
+    {
+        flashPageErase(HAL_OTA_FLASH_ADDR + i * FLASH_PAGE_SIZE);
+    }
+}
 
 void HalFlashWrite(uint32_t addr, const uint8_t *data, uint32_t len)
 {

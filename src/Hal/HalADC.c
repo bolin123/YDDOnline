@@ -105,7 +105,6 @@ static HalADCConfigs_t ADCConfigs[HAL_ADC_CHANNEL_COUNT] = {
 static volatile uint16_t g_adcValue[HAL_ADC_CHANNEL_COUNT];
 static volatile uint16_t g_maxValue[2];
 
-
 uint16_t HalADCGetCollectValue(uint8_t ch)
 {
     if(ch < 2)
@@ -276,7 +275,6 @@ void DMA1_Channel1_IRQHandler(void)
     if(DMA_GetFlagStatus(DMA1_FLAG_TC1))
     {
         DMA_ClearITPendingBit(DMA1_FLAG_TC1);
-        
         for(i = 0; i < 2; i++)
         {
             if(g_maxValue[i] < g_adcValue[i]) //取最大值
@@ -284,9 +282,6 @@ void DMA1_Channel1_IRQHandler(void)
                 g_maxValue[i] = g_adcValue[i];
             }
         }
-        
-        //g_maxValue[0] = (g_maxValue[0] > g_adcValue[0]) ? g_maxValue[0] : g_adcValue[0];
-        //g_maxValue[1] = (g_maxValue[1] > g_adcValue[1]) ? g_maxValue[1] : g_adcValue[1];
     }
 }
 

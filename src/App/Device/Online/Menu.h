@@ -8,7 +8,7 @@ typedef enum
     MENU_ID_ADDR = 0, //通信地址
     MENU_ID_RFCHN,    //无线通道
     MENU_ID_DEVTYPE,  //设备类型
-    MENU_ID_COMMTYPE, //通信方式
+    //MENU_ID_COMMTYPE, //通信方式
     //MENU_ID_THRESHOLD,
     MENU_ID_COUNT,
 }MenuID_t;

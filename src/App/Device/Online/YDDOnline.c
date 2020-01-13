@@ -14,6 +14,7 @@
 #include "DispLoop.h"
 #include "Menu.h"
 #include "DataManager.h"
+#include "IRDataTransfer.h"
 
 #define YDD_FALL_SLEEP_DELAY 1000
 
@@ -104,7 +105,7 @@ static void lightActiveDetect(void)
             if(SysTimeHasPast(g_lightDetectTime, 2000))
             {
                 DispLoopStart(2);
-                SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+                //SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
                 g_startLightDetect = false;
             }
         }
@@ -135,16 +136,14 @@ static void yddSleep(PM_t *pm)
 static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
 {
     uint8_t i = 0;
-//    uint16_t *data;
     uint16_t reportData[16];
     float temperature;
-    //Syslog("event = %d", event);
+
     if(event == SENSORS_EVENT_SAMPLING_UPDATE)
     {
         if(chn < HAL_SENSOR_ID_COUNT)
         {
             memcpy((void *)&g_sensorContext[chn], args, sizeof(SensorsContext_t));
-            //printf("ch%d: %d, %d\n", chn, g_sensorContext[chn].amplitude, g_sensorContext[chn].frequency);
         }
     }
     else if(event == SENSORS_EVENT_SAMPLING_DONE)
@@ -172,15 +171,7 @@ static void sensorsEventHandle(SensorsEvent_t event, uint8_t chn, void *args)
 
             if(g_queryRecved)
             {
-                if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-                {
-                   WirelessReportData(SysErrorCode(), SysPowerPercent(), reportData, i);
-                }
-                else
-                {
-                    HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_DISABLE_LEVEL);
-                    WiredProtoReportData(SysErrorCode(), SysPowerPercent(), reportData, i);
-                }
+                WirelessReportData(SysErrorCode(), SysPowerPercent(), reportData, i);
                 g_queryRecved = false;
             }
 
@@ -229,11 +220,15 @@ static void wirelessEventHandle(WirelessEvent_t event, void *args)
 {
     if(event == WIRELESS_EVENT_QUERY)
     {
-        g_queryRecved = true;
-        g_lostQueryCount = 0;
-        Syslog("sensor sampling...");
-        SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
-        PMStartSleep(2000);
+        if(!IRDataTransferIsStart())
+        {
+            g_queryRecved = true;
+            g_lostQueryCount = 0;
+            Syslog("sensor sampling...");
+            SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
+            PMStartSleep(2000);
+        }
+        
         updateQueryTime();
     }
 }
@@ -306,21 +301,71 @@ static void sensorsRegist(void)
 static void disploopDoneHandle(void)
 {
     Syslog("");
-    if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
+    PMStartSleep(YDD_FALL_SLEEP_DELAY);
+}
+
+static void updateUTCTimer(uint8_t *utc)
+{
+    int setUTC, realUTC;
+    memcpy(&setUTC, utc, 4);
+    realUTC = (int)HalRTCGetUtc();
+    if(abs(setUTC - realUTC) > 10)
     {
-        PMStartSleep(YDD_FALL_SLEEP_DELAY);
-    }
-    else
-    {
-        DigitalLEDOff();
+        HalRTCSetUtc(setUTC);
     }
 }
 
-static void irKeyEventHandle(IRKey_t key)
+static void irDataTransferPercentShow(uint8_t percent)
+{
+    DigitalLEDSetChars(DIGITAL_LED_ID_CMD, DIGITAL_FLAG_S, false);
+    DigitalLEDSetChars(DIGITAL_LED_ID_1, percent / 100, false);
+    DigitalLEDSetChars(DIGITAL_LED_ID_2, percent % 100 / 10, false);
+    DigitalLEDSetChars(DIGITAL_LED_ID_3, percent % 10, false);
+}
+
+static void irDataTransEventHandle(IRDataTransferEvent_t event, uint32_t value)
+{
+    if(event == IR_DTRANS_EVENT_PROCESS)
+    {
+        irDataTransferPercentShow((uint8_t)value);
+    }
+    else if(event == IR_DTRANS_EVENT_RESULT)
+    {
+        Syslog("result, success = %d", value);
+        DigitalLEDOff();
+        IRDataTransferStop();
+        PMStartSleep(500);
+    }
+}
+
+static void irKeyEventHandle(uint8_t key, uint8_t *contents)
 {
     Syslog("key = %d", key);
     DispLoopStop();
-    MenuKeyHandle(key);
+    PMStartSleep(5000);
+    if(IR_KEY_READDATA == key)
+    {
+        updateUTCTimer(contents);
+        if(IRDataTransferStart())
+        {
+            MenuDeactive();
+            DigitalLEDOn();
+            irDataTransferPercentShow(0);
+        }
+    }
+    else if(IR_KEY_READDATA_ACK == key)
+    {
+        IRDataTransferResume();
+    }
+    else
+    {
+        if(IR_KEY_MENU == key)
+        {
+            updateUTCTimer(contents);
+        }
+        MenuKeyHandle((IRKey_t)key);
+        PMStartSleep(20000);
+    }
 }
 
 static DispLoopValue_t *disploopGetValue(DispLoopID_t id)
@@ -374,32 +419,10 @@ static DispLoopValue_t *disploopGetValue(DispLoopID_t id)
     return &displayValue;
 }
 
-static void startSensorsCapture(void* args)
-{
-    SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
-}
-
-static void wiredQueryCallback(void)
-{
-    uint32_t span = SysRfAddressGet() * 50; //根据设备地址错开上报时间，单位50ms
-    Syslog("");
-    HalGPIOSetLevel(HAL_STATUS_LED_PIN, HAL_STATUS_LED_ENABLE_LEVEL);
-    SysTimerSet(startSensorsCapture, span, 0, NULL);
-    g_queryRecved = true;
-}
-
 void YDDOnlineLightActive(void)
 {
-    if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-    {
-        HalExitSet(HAL_EXIT_LIGHT_WAKEUP, false);
-        PMWakeup(PM_WAKEUP_TYPE_LIGHT);
-    }
-    else
-    {
-        DigitalLEDOn();
-        DispLoopStart(2);
-    }
+    HalExitSet(HAL_EXIT_LIGHT_WAKEUP, false);
+    PMWakeup(PM_WAKEUP_TYPE_LIGHT);
 }
 
 static void lowInit(void)
@@ -425,10 +448,7 @@ static void menuEventHandle(MenuEvent_t event)
     case MENU_EVENT_TIMEOUT:
         MenuDeactive();
         DigitalLEDOff();
-        if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-        {
-            PMStartSleep(100);//无按键，30秒后休眠
-        }
+        PMStartSleep(500);//无按键，30秒后休眠
     break;
     }
 }
@@ -444,12 +464,6 @@ static unsigned short menuGetValue(MenuID_t id)
     break;
     case MENU_ID_RFCHN:
         value = SysRfChannelGet();
-    break;
-    case MENU_ID_DEVTYPE:
-        value = SysDeviceTypeGet();
-    break;
-    case MENU_ID_COMMTYPE:
-        value = SysCommunicateTypeGet();
     break;
     default:
     break;
@@ -470,14 +484,6 @@ static void menuSetValue(MenuID_t id, uint16_t value)
         SysRfChannelSet((uint8_t)value);
         WirelessSetChannel((uint8_t)value);
     break;
-    case MENU_ID_DEVTYPE:
-        SysDeviceTypeSet((HalDeviceType_t)value);
-    break;
-    case MENU_ID_COMMTYPE:
-        SysCommunicateTypeSet((SysCommunicateType_t)value);
-        for(uint16_t i = 0; i < 10000; i++); //wait
-        SysReboot();
-    break;
     default:
     break;
     }
@@ -489,15 +495,11 @@ static void displayInit(void)
     DispLoopInit(disploopDoneHandle);
     DispLoopRegister(DISPLOOP_ID_ADDR,    disploopGetValue);
     DispLoopRegister(DISPLOOP_ID_RFCHN,   disploopGetValue);
-    //DispLoopRegister(DISPLOOP_ID_DEVTYPE, disploopGetValue);
     if(SysDeviceTypeGet() == HAL_DEVICE_TYPE_PRESS)
     {
         DispLoopRegister(DISPLOOP_ID_PRESS1, disploopGetValue);
         DispLoopRegister(DISPLOOP_ID_PRESS2, disploopGetValue);
     }
-
-    //DispLoopRegister(DISPLOOP_ID_ERRCODE, disploopGetValue);
-    //DispLoopRegister(DISPLOOP_ID_POWER,   disploopGetValue);
 
     MenuInit(menuEventHandle);
     MenuItem_t item;
@@ -512,38 +514,15 @@ static void displayInit(void)
     MenuRegister(MENU_ID_ADDR, &item);
     
     //MENU_ID_RFCHN
-    if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-    {
-        item.flag     = DIGITAL_FLAG_C;
-        item.digitNum = DIGITAL_LED_ID_2;
-        item.step     = 1;
-        item.max      = HAL_RF_CHANNEL_NUM;
-        item.min      = 1;
-        item.getValue = menuGetValue;
-        item.setValue = menuSetValue;
-        MenuRegister(MENU_ID_RFCHN, &item);
-    }
-    
-    //MENU_ID_DEVTYPE
-    item.flag     = DIGITAL_FLAG_D;
-    item.digitNum = DIGITAL_LED_ID_3;
+    item.flag     = DIGITAL_FLAG_C;
+    item.digitNum = DIGITAL_LED_ID_2;
     item.step     = 1;
-    item.max      = 2;
+    item.max      = HAL_RF_CHANNEL_NUM;
     item.min      = 1;
     item.getValue = menuGetValue;
     item.setValue = menuSetValue;
-    MenuRegister(MENU_ID_DEVTYPE, &item);
+    MenuRegister(MENU_ID_RFCHN, &item);
 
-    //MENU_ID_COMMTYPE
-    item.flag     = DIGITAL_FLAG_E;
-    item.digitNum = DIGITAL_LED_ID_3;
-    item.step     = 1;
-    item.max      = 2;
-    item.min      = 1;
-    item.getValue = menuGetValue;
-    item.setValue = menuSetValue;
-    MenuRegister(MENU_ID_COMMTYPE, &item);
-    
     DigitalLEDOn();
     DispLoopStart(2);
     SensorsSamplingStart(g_sensors, 1, HAL_FLASH_INVALID_ADDR);
@@ -553,37 +532,21 @@ void YDDOnlineInit(void)
 {
     lowInit();
     displayInit();
-    if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-    {
-        WirelessInit(wirelessEventHandle);
-    }
-    else
-    {
-        WiredProtoInit(wiredQueryCallback);
-    }
+    WirelessInit(wirelessEventHandle);
     IRInit(irKeyEventHandle);
     DataManagerInit();
-    
+    IRDataTransferInit(irDataTransEventHandle);
     HalRTCAlarmSet(SysQueryIntervalGet() / 2 + SysQueryIntervalGet());
-    // TODO:test
-    //HalADCStop();// TODO: test,
-    //PMWakeup();// TODO: test,
 }
 
 void YDDOnlinePoll(void)
 {
     SensorsPoll(g_sensors);
-    if(SysCommunicateTypeGet() == SYS_COMMUNICATE_TYPE_WIRELESS)
-    {
-        WirelessPoll();
-    }
-    else
-    {
-        WiredProtoPoll();
-    }
+    WirelessPoll();
     DispLoopPoll();
     MenuPoll();
     IRPoll();
+    IRDataTransferPoll();
 	lightActiveDetect();
 }
 

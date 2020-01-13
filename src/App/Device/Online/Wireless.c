@@ -2,6 +2,7 @@
 #include "RFModule.h"
 
 #define WIRELESS_WAIT_TIMES 0xE803D007 //设置外设开机时间1000ms+响应超时2000ms
+#define WIRELESS_ACT_OUTPUT_LEVEL 0  //act管脚中断输出低电平
 
 typedef struct
 {
@@ -92,22 +93,33 @@ static void rfEventHandle(RFModuleEvent_t event, void *arg)
 {
     uint8_t chnl;
     uint32_t times;
+    uint32_t actmode;
+    
     if(event == RFMODULE_EVENT_GET_RFCHNL)
     {
         chnl = (uint8_t)(uint32_t)arg;
-        Syslog("got chnl = %d", chnl);
+        SysPrint("RF chnl = %d\n", chnl);
         if(chnl != SysRfChannelGet())
         {
             RFMoudleSetChannel(SysRfChannelGet());
         }
     }
-    else //RFMODULE_EVENT_GET_WAITTIME
+    else if(event == RFMODULE_EVENT_GET_WAITTIME)//RFMODULE_EVENT_GET_WAITTIME
     {
         times = (uint32_t)arg;
-        Syslog("got wait times = %04x, %04x", times, (uint32_t)arg);
+        SysPrint("RF wait times = %04x, %04x\n", times, (uint32_t)arg);
         if(times != WIRELESS_WAIT_TIMES)
         {
             RFModuleSetWaitTimes(WIRELESS_WAIT_TIMES);
+        }
+    }
+    else //RFMODULE_EVENT_GET_ACTMODE
+    {
+        actmode = (uint32_t)arg;
+        SysPrint("ACT mode: output [%s]\n", actmode ? "high":"low");
+        if(actmode != WIRELESS_ACT_OUTPUT_LEVEL)
+        {
+            RFModuleSetActMode(WIRELESS_ACT_OUTPUT_LEVEL);
         }
     }
 }
@@ -118,6 +130,7 @@ void WirelessInit(WirelessDataEvent_cb eventHandle)
     RFModuleInit(rfEventHandle);
     RFModuleGetChannel();
     RFModuleGetWaitTimes();
+    RFModuleGetActMode();
 }
 
 void WirelessPoll(void)

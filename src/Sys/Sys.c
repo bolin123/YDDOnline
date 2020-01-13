@@ -30,7 +30,7 @@ uint8_t SysErrorCode(void)
 
 uint8_t SysPowerPercent(void)
 {
-    int16_t max = 3240, min = 2296; //电池电压：2.61v ~ 1.85v
+    int16_t max = 2194, min = 1757; //电池电压：1.768v ~ 1.416v
     int8_t percent = 0;
 
     if(g_powerAverage > max)
@@ -78,16 +78,6 @@ int SysDateTimeSet(SysDateTime_t *dateTime)
     return HalRTCSetTime((HalRTCTime_t *)dateTime);
 }
 
-SysCommunicateType_t SysCommunicateTypeGet(void)
-{
-    return g_sysConfig.commType;
-}
-
-void SysCommunicateTypeSet(SysCommunicateType_t type)
-{
-    g_sysConfig.commType = type;
-    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
-}
 
 uint16_t SysSignalThresholdGet(void)
 {
@@ -144,15 +134,9 @@ void SysRfChannelSet(uint8_t chnl)
     HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
 }
 
-void SysDeviceTypeSet(HalDeviceType_t type)
-{
-    g_sysConfig.devType = (uint8_t)type;
-    HalFlashWrite(HAL_DEVICE_ARGS_ADDR, (const uint8_t *)&g_sysConfig, sizeof(SysConfig_t));
-}
-
 HalDeviceType_t SysDeviceTypeGet(void)
 {
-    return (HalDeviceType_t)g_sysConfig.devType;
+    return HAL_DEVICE_TYPE_PRESS;
 }
 
 void SysRawDataRead(uint32_t addresss, uint8_t *buff, uint16_t length)

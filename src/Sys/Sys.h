@@ -10,7 +10,8 @@
 #define SysDateTime_t HalRTCTime_t
 #define SysDateTime() HalRTCGetTime()
 
-#define Syslog(...) do{printf("[%s]: ", __FUNCTION__); printf(__VA_ARGS__); printf("\r\n");}while(0)
+#define SysPrint printf
+#define Syslog(...) do{SysPrint("[%s]: ", __FUNCTION__); SysPrint(__VA_ARGS__); SysPrint("\r\n");}while(0)
 
 //#define SYS_MAC_ADDR_LEN 3
 
@@ -25,9 +26,6 @@ void SysReboot(void);
 uint8_t SysErrorCode(void);
 uint8_t SysPowerPercent(void);
 int SysDateTimeSet(SysDateTime_t *dateTime);
-
-SysCommunicateType_t SysCommunicateTypeGet(void);
-void SysCommunicateTypeSet(SysCommunicateType_t type);
 
 void SysQueryIntervalSet(uint16_t time);
 uint16_t SysQueryIntervalGet(void);

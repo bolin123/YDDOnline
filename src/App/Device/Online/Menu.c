@@ -18,7 +18,7 @@ typedef struct
 static MenuItem_t g_menuItems[MENU_ID_COUNT];
 static MenuFlashData_t g_flashData;
 static bool g_menuActived = false;
-static uint32_t g_activeTime;
+//static uint32_t g_activeTime;
 static MenuEventHandle_cb g_eventHandle;
 
 static void menuShowPoll(void)
@@ -219,7 +219,7 @@ void MenuKeyHandle(IRKey_t key)
     default:
         break;
     }
-    g_activeTime = SysTime();
+    //g_activeTime = SysTime();
 }
 
 void MenuRegister(MenuID_t id, MenuItem_t *item)
@@ -230,7 +230,7 @@ void MenuRegister(MenuID_t id, MenuItem_t *item)
         g_menuItems[id].enable = true;
     }
 }
-
+/*
 static void menuActiveTimePoll(void)
 {
     if(g_menuActived && SysTimeHasPast(g_activeTime, MENU_TIMEOUT_COUNT))
@@ -239,6 +239,7 @@ static void menuActiveTimePoll(void)
         //g_menuActived = false;
     }
 }
+*/
 
 void MenuInit(MenuEventHandle_cb eventHandle)
 {
@@ -249,6 +250,6 @@ void MenuInit(MenuEventHandle_cb eventHandle)
 void MenuPoll(void)
 {
     menuShowPoll();
-    menuActiveTimePoll();
+    //menuActiveTimePoll();
 }
 

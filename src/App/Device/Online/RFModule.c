@@ -14,6 +14,8 @@ typedef enum
     RFMODULE_CMD_SET_RFCHN,
     RFMODULE_CMD_GET_WAITTIME,
     RFMODULE_CMD_SET_WAITTIME,
+    RFMODULE_CMD_GET_ACTMODE,
+    RFMODULE_CMD_SET_ACTMODE,
 }RFModuleCmd_t;
 
 typedef struct RFSendList_st
@@ -174,11 +176,19 @@ static void atcmdParse(char *atcmd)
                     }
                 }
             }
-            else //RFMODULE_CMD_GET_WAITTIME
+            else if(rfsend->cmd == RFMODULE_CMD_GET_WAITTIME) //RFMODULE_CMD_GET_WAITTIME
             {
                 //ATCbD007B80B
                 uint32_t time = (uint32_t)strtoul(value, NULL, 16);
                 g_rfModuleEventHandle(RFMODULE_EVENT_GET_WAITTIME, (void *)time);
+            }
+            else if(rfsend->cmd == RFMODULE_CMD_GET_ACTMODE)
+            {
+                uint32_t mode = (uint32_t)(strtoul(value, NULL, 16) & 0x1); //最低位表示输出高或低
+                g_rfModuleEventHandle(RFMODULE_EVENT_GET_ACTMODE, (void *)mode);
+            }
+            else
+            {
             }
             
             sendlistDel(rfsend);
@@ -313,6 +323,34 @@ void RFModuleGetChannel(void)
     char *getId = "ATCb002B03\r";
     sendlistInsert(getId, RFMODULE_CMD_GET_RFCHN);
 }
+
+void RFModuleGetActMode(void)
+{
+    char *mode = "ATCb004401\r";
+    
+    sendlistInsert(mode, RFMODULE_CMD_GET_ACTMODE);
+}
+
+/*
+0=输出低
+1=输出高
+*/
+void RFModuleSetActMode(uint8_t level)
+{
+    char *low = "ATCM004428\r";
+    char *high = "ATCM004429\r";
+
+    Syslog("output = %d", level);
+    if(level)
+    {
+        sendlistInsert(high, RFMODULE_CMD_SET_ACTMODE);
+    }
+    else
+    {
+        sendlistInsert(low, RFMODULE_CMD_SET_ACTMODE);
+    }
+}
+
 
 void RFModuleGetWaitTimes(void)
 {
